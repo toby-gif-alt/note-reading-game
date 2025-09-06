@@ -2391,11 +2391,39 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
     
   } else {
     // Wrong answer - handle differently for chords vs single notes
-    if (leftmostNote) {
-      if (leftmostNote.isChord) {
-        // For chords: instantly delete the entire chord for the affected hand/clef and reset progress
-        const chordId = leftmostNote.chordId;
-        const affectedClef = leftmostNote.clef;
+    // For wrong answers, we need to find the leftmost note/chord regardless of whether it matches user input
+    let leftmostNoteForDeletion = null;
+    let minDistanceForDeletion = Infinity;
+    
+    // Find the leftmost note/chord on the stave for deletion
+    movingNotes.forEach((note) => {
+      // In piano mode, check if this note belongs to an active hand
+      if (pianoModeActive && currentClef === 'grand') {
+        const leftHandActive = pianoModeSettings.leftHand !== 'none';
+        const rightHandActive = pianoModeSettings.rightHand !== 'none';
+        
+        // Only consider notes from clefs that have active hands
+        const noteIsFromActiveHand = 
+          (note.clef === 'bass' && leftHandActive) || 
+          (note.clef === 'treble' && rightHandActive);
+        
+        if (!noteIsFromActiveHand) {
+          return; // Skip notes from inactive hands
+        }
+      }
+      
+      const distance = note.x;
+      if (distance < minDistanceForDeletion) {
+        minDistanceForDeletion = distance;
+        leftmostNoteForDeletion = note;
+      }
+    });
+
+    if (leftmostNoteForDeletion) {
+      if (leftmostNoteForDeletion.isChord) {
+        // For chords: instantly delete the leftmost chord and reset progress
+        const chordId = leftmostNoteForDeletion.chordId;
+        const affectedClef = leftmostNoteForDeletion.clef;
         
         // Remove all notes in this chord
         for (let i = movingNotes.length - 1; i >= 0; i--) {
@@ -2410,18 +2438,18 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
         // Spawn replacement chord for the affected hand/clef
         respawnNote();
         
-        feedback.textContent = `Wrong note! Chord deleted for ${affectedClef} clef.`;
+        feedback.textContent = `Wrong note! Leftmost chord deleted.`;
         feedback.style.color = '#d0021b';
         feedback.style.fontSize = '16px';
       } else {
         // Single note - use existing behavior with flashing
-        leftmostNote.flashing = true;
-        leftmostNote.flashStartTime = Date.now();
-        leftmostNote.flashCount = 0;
+        leftmostNoteForDeletion.flashing = true;
+        leftmostNoteForDeletion.flashStartTime = Date.now();
+        leftmostNoteForDeletion.flashCount = 0;
         
         // Remove the note after the flashing is done
         setTimeout(() => {
-          const noteIndex = movingNotes.indexOf(leftmostNote);
+          const noteIndex = movingNotes.indexOf(leftmostNoteForDeletion);
           if (noteIndex !== -1) {
             movingNotes.splice(noteIndex, 1);
             
