@@ -618,6 +618,9 @@ h1 {
   color: white;
   font-family: 'Arial', sans-serif;
   min-width: 250px;
+  /* Prevent flashing by hiding initially */
+  display: none !important;
+  visibility: hidden;
   z-index: 100;
   animation: pianoModeSlideIn 0.3s ease-out;
 }

@@ -285,7 +285,7 @@ let chordProgress = new Map(); // chordId -> { pressedNotes: Set, timestamps: Ma
 // FIXED: Now called immediately on every input event instead of being throttled
 function cleanupStaleChordProgress() {
   const currentTime = Date.now();
-  const maxAge = 10000; // 10 seconds - much longer than grace period to catch edge cases
+  const maxAge = 5000; // 5 seconds - reduced from 10 seconds to prevent excessive accumulation
   
   for (const [chordId, chordData] of chordProgress.entries()) {
     // Remove entries that are too old or reference notes that no longer exist
@@ -295,6 +295,18 @@ function cleanupStaleChordProgress() {
     if (isStale || !chordStillExists) {
       chordProgress.delete(chordId);
     }
+  }
+  
+  // Additional safety check: if chordProgress gets too large, clear the oldest entries
+  if (chordProgress.size > 10) {
+    // Convert to array, sort by firstPressTime, keep only the 5 most recent
+    const entries = Array.from(chordProgress.entries());
+    entries.sort((a, b) => b[1].firstPressTime - a[1].firstPressTime);
+    
+    chordProgress.clear();
+    entries.slice(0, 5).forEach(([id, data]) => {
+      chordProgress.set(id, data);
+    });
   }
 }
 
@@ -682,6 +694,31 @@ function createGameOverExplosions(clefX, clefY, staffInfo) {
         currentFrameIndex: 0
       });
     }, i * (gameOverDuration / numberOfExplosions)); // Sequential timing
+  }
+}
+
+// Create minimal explosions to prevent screen freeze
+function createMinimalExplosions(clefX, clefY) {
+  // Just 2-3 small explosions with short duration
+  const numberOfExplosions = 3;
+  const explosionDuration = 800; // 0.8 seconds total
+  
+  for (let i = 0; i < numberOfExplosions; i++) {
+    setTimeout(() => {
+      // Small area around the clef
+      const randomX = clefX + (Math.random() - 0.5) * 100;
+      const randomY = clefY + (Math.random() - 0.5) * 60;
+      
+      explosions.push({
+        x: randomX,
+        y: randomY,
+        size: 40 + Math.random() * 20, // Smaller explosions (40-60px)
+        startTime: Date.now(),
+        duration: 600, // Short duration
+        frames: generateExplosionFrames(),
+        currentFrameIndex: 0
+      });
+    }, i * 150); // Quick succession
   }
 }
 
@@ -1229,17 +1266,17 @@ function spawnNote() {
                            (pianoModeSettings.rightHand !== 'none' && pianoModeSettings.rightHand !== 'chords');
     
     if (isChordSpawn) {
-      // Chords come slower
-      effectiveSpawnRate = Math.floor(noteSpawnRate * 1.6); // 60% slower for chords
+      // Chords come at same speed as normal mode
+      effectiveSpawnRate = Math.floor(noteSpawnRate * 1.0); // Same speed as normal mode
     } else if (bothHandsMelody) {
-      // Different speeds for each hand when both are melody
-      const leftHandSpawnRate = Math.floor(noteSpawnRate * 0.8); // Left hand 20% faster
-      const rightHandSpawnRate = Math.floor(noteSpawnRate * 1.2); // Right hand 20% slower
+      // Different speeds for each hand when both are melody, but closer spacing allowed
+      const leftHandSpawnRate = Math.floor(noteSpawnRate * 0.9); // Left hand 10% faster
+      const rightHandSpawnRate = Math.floor(noteSpawnRate * 1.0); // Right hand normal speed
       // Use alternating spawn rates to create displacement
       effectiveSpawnRate = (now % 2 === 0) ? leftHandSpawnRate : rightHandSpawnRate;
     } else {
-      // Melody comes quicker  
-      effectiveSpawnRate = Math.floor(noteSpawnRate * 1.0); // Normal speed for melody
+      // Melody comes at normal speed
+      effectiveSpawnRate = Math.floor(noteSpawnRate * 1.0); // Same speed as normal mode
     }
   }
   
@@ -1525,39 +1562,34 @@ function gameOver() {
   stopBackgroundMusic();
   playSound('gameOver');
   
-  // Add continuous shake for entire game over duration (3 seconds)
-  triggerShake(12, 3000); // High intensity, 3 second duration to match audio
+  // Reduced shake effect to prevent freeze - shorter duration and lower intensity
+  triggerShake(6, 500); // Lower intensity, shorter duration (0.5 seconds)
   
-  // Get dynamic clef position and staff info for enhanced explosions
+  // Minimal explosion effects instead of the heavy game over explosions
+  // Just a few small explosions instead of 12 large ones
   if (currentClef === 'grand') {
-    // For grand staff, create explosions for both treble and bass clefs
+    // For grand staff, create minimal explosions
     if (currentTrebleStave) {
-      createGameOverExplosions(currentTrebleStave.clefX, currentTrebleStave.clefY, currentTrebleStave.staffLines);
+      createMinimalExplosions(currentTrebleStave.clefX, currentTrebleStave.clefY);
     }
     if (currentBassStave) {
-      // Slight delay for bass clef explosions to create a cascading effect
-      setTimeout(() => {
-        createGameOverExplosions(currentBassStave.clefX, currentBassStave.clefY, currentBassStave.staffLines);
-      }, 300);
+      createMinimalExplosions(currentBassStave.clefX, currentBassStave.clefY);
     }
   } else {
-    // Single staff - create explosions for the active clef
+    // Single staff - create minimal explosions for the active clef
     let clefX = 35; // Default fallback  
     let clefY = canvas.height * 0.2 + 60; // Default fallback
-    let staffInfo = null;
     
     if (currentClef === 'treble' && currentTrebleStave) {
       clefX = currentTrebleStave.clefX;
       clefY = currentTrebleStave.clefY;
-      staffInfo = currentTrebleStave.staffLines;
     } else if (currentClef === 'bass' && currentBassStave) {
       clefX = currentBassStave.clefX;
       clefY = currentBassStave.clefY;
-      staffInfo = currentBassStave.staffLines;
     }
     
-    // Create explosions for single staff
-    createGameOverExplosions(clefX, clefY, staffInfo);
+    // Create minimal explosions for single staff
+    createMinimalExplosions(clefX, clefY);
   }
   
   // Check and save high score
@@ -2042,7 +2074,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
       
       // Track which notes have been pressed with timestamps for grace period
       const currentTime = Date.now();
-      const gracePeriodsMs = 100; // 100ms grace period for chord completion
+      const gracePeriodsMs = 300; // Increased to 300ms grace period for more forgiving chord completion
       
       if (!chordProgress.has(chordId)) {
         chordProgress.set(chordId, {
@@ -2053,12 +2085,16 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
       }
       const chordData = chordProgress.get(chordId);
       
-      // Check if we're still within the grace period
-      if (currentTime - chordData.firstPressTime > gracePeriodsMs) {
-        // Grace period expired, reset the chord progress
-        chordData.pressedNotes.clear();
-        chordData.timestamps.clear();
-        chordData.firstPressTime = currentTime;
+      // Check if we're still within the grace period or if this is a continuation of the same chord
+      const timeSinceFirstPress = currentTime - chordData.firstPressTime;
+      if (timeSinceFirstPress > gracePeriodsMs && chordData.pressedNotes.size > 0) {
+        // If grace period expired but we had some progress, be more lenient
+        // Only reset if we've been completely idle for a while
+        if (timeSinceFirstPress > gracePeriodsMs * 3) {
+          chordData.pressedNotes.clear();
+          chordData.timestamps.clear();
+          chordData.firstPressTime = currentTime;
+        }
       }
       
       // Add this note to pressed notes with timestamp
@@ -2069,6 +2105,16 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
       // Check if all notes in chord have been pressed within grace period
       const allNoteLetters = new Set(allChordNotes.map(note => note.note.toUpperCase()));
       const allPressed = [...allNoteLetters].every(noteLetter => chordData.pressedNotes.has(noteLetter));
+      
+      // Safety check: ensure we don't have more pressed notes than the chord actually contains
+      if (chordData.pressedNotes.size > allNoteLetters.size) {
+        console.warn(`Chord progress has more notes than chord contains. Resetting. ChordId: ${chordId}`);
+        chordData.pressedNotes.clear();
+        chordData.timestamps.clear();
+        chordData.firstPressTime = currentTime;
+        chordData.pressedNotes.add(noteKey);
+        chordData.timestamps.set(noteKey, currentTime);
+      }
       
       // Chord lockout timer removed - accept chord completion if all notes are pressed within grace period
       
