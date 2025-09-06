@@ -1903,6 +1903,12 @@ async function initializeGame() {
     updateMusicForLevel(level);
   }
   
+  // Hide Piano Mode controls during gameplay
+  const pianoModeControls = document.getElementById('pianoModeControls');
+  if (pianoModeControls) {
+    pianoModeControls.style.display = 'none';
+  }
+  
   // Initialize display values
   updateLifeDisplay();
   notesDestroyedDisplay.textContent = `Notes Destroyed: ${notesDestroyed}`;
