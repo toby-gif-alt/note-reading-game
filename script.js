@@ -1675,11 +1675,11 @@ function getNotesForPianoModeHand(hand, clef, availableNotes) {
       return midi <= b3Midi;
     });
   } else if (clef === 'treble') {
-    // Treble clef: lowest note should be D4  
+    // Treble clef: lowest note should be C4  
     handNotes = handNotes.filter(note => {
       const midi = note.midi || scientificToMidi(note.letter, note.octave);
-      const d4Midi = scientificToMidi('D', 4);
-      return midi >= d4Midi;
+      const c4Midi = scientificToMidi('C', 4);
+      return midi >= c4Midi;
     });
   }
   
@@ -1955,6 +1955,70 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
   // FIXED: Clean up stale chord progress immediately on every input to prevent registration failures
   // This ensures responsive chord input by removing the 5-second throttling that was blocking new input
   cleanupStaleChordProgress();
+  
+  // Check if any chords exist and if this note belongs to any chord
+  const existingChords = movingNotes.filter(note => note.isChord);
+  if (existingChords.length > 0) {
+    // Check if the pressed note belongs to any existing chord
+    const isNoteInAnyChord = existingChords.some(note => note.note.toUpperCase() === userNote);
+    
+    // If in chord mode (hands are in chord mode) and note is not part of any chord, destroy all chords
+    const isChordMode = pianoModeActive && currentClef === 'grand' && 
+      (pianoModeSettings.leftHand === 'chords' || pianoModeSettings.rightHand === 'chords');
+    
+    if (isChordMode && !isNoteInAnyChord) {
+      // Wrong note pressed in chord mode - destroy all chords
+      const uniqueChordIds = new Set(existingChords.map(note => note.chordId));
+      
+      uniqueChordIds.forEach(chordId => {
+        // Remove all notes with this chord ID
+        for (let i = movingNotes.length - 1; i >= 0; i--) {
+          if (movingNotes[i].isChord && movingNotes[i].chordId === chordId) {
+            movingNotes.splice(i, 1);
+          }
+        }
+        // Clear chord progress
+        chordProgress.delete(chordId);
+      });
+      
+      // Spawn replacement notes
+      uniqueChordIds.forEach(() => respawnNote());
+      
+      // Show feedback
+      feedback.textContent = 'Wrong note! All chords destroyed.';
+      feedback.style.color = '#d0021b';
+      feedback.style.fontSize = '16px';
+      
+      // Lose a life
+      lives--;
+      triggerShake(3, 200);
+      
+      // Add explosion effect
+      let clefX = 35, clefY = canvas.height * 0.2 + 60;
+      if (currentTrebleStave) {
+        clefX = currentTrebleStave.clefX;
+        clefY = currentTrebleStave.clefY;
+      } else if (currentBassStave) {
+        clefX = currentBassStave.clefX;
+        clefY = currentBassStave.clefY;
+      }
+      
+      createClefExplosion(clefX, clefY, 65, 500);
+      flashEffect.active = true;
+      flashEffect.startTime = Date.now();
+      playSound('explosionLoseLive');
+      updateLifeDisplay();
+      
+      if (lives <= 0) {
+        gameOver();
+      }
+      
+      // Update displays and return
+      scoreDisplay.textContent = `Score: ${score}`;
+      notesDestroyedDisplay.textContent = `Notes Destroyed: ${notesDestroyed}`;
+      return;
+    }
+  }
   
   // Find the leftmost note (closest to clef) - with special handling for piano mode hand independence
   let leftmostNote = null;
@@ -2490,6 +2554,14 @@ window.onload = function () {
   // Load settings first
   loadGameSettings();
   initializeGame();
+  
+  // Hide MIDI controls on mobile devices
+  if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+    const midiControl = document.querySelector('.midi-control');
+    if (midiControl) {
+      midiControl.style.display = 'none';
+    }
+  }
   
   // Update clef display after DOM is ready
   updateClefDisplay();

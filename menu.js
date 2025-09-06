@@ -220,10 +220,11 @@ function updatePianoModeUI() {
   
   // Check if running on mobile device - disable piano mode completely on mobile
   if (isMobileDevice()) {
-    pianoModeStatus.textContent = 'Not Available on Mobile';
-    pianoModeBtn.classList.remove('active');
-    pianoModeBtn.classList.add('midi-unavailable');
-    pianoModeOptions.style.display = 'none';
+    // Hide piano mode completely on mobile
+    pianoModeBtn.style.display = 'none';
+    if (pianoModeOptions) {
+      pianoModeOptions.style.display = 'none';
+    }
     gameSettings.pianoMode.enabled = false;
     gameSettings.pianoMode.active = false;
     updateClefButtonsForPianoMode(false);
@@ -396,6 +397,24 @@ function updateClefButtons() {
 document.addEventListener('DOMContentLoaded', function() {
   loadSettings();
   loadHighScores(); // Load high scores
+  
+  // Hide MIDI options completely on mobile devices
+  if (isMobileDevice()) {
+    // Hide MIDI device selector in options modal
+    const midiOptionGroup = document.querySelector('.option-group:has(#midiDeviceMenuSelector)');
+    if (midiOptionGroup) {
+      midiOptionGroup.style.display = 'none';
+    }
+    
+    // Alternative approach if :has() is not supported
+    const midiDeviceSelector = document.getElementById('midiDeviceMenuSelector');
+    if (midiDeviceSelector) {
+      const midiParentGroup = midiDeviceSelector.closest('.option-group');
+      if (midiParentGroup) {
+        midiParentGroup.style.display = 'none';
+      }
+    }
+  }
   
   // Initialize Piano Mode UI
   updatePianoModeUI();
