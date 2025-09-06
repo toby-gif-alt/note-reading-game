@@ -218,16 +218,23 @@ function updatePianoModeUI() {
   
   if (!pianoModeBtn) return;
   
-  // Check if running on mobile device - disable piano mode completely on mobile
+  // Check if running on mobile device - completely hide piano mode on mobile
   if (isMobileDevice()) {
-    pianoModeStatus.textContent = 'Not Available on Mobile';
-    pianoModeBtn.classList.remove('active');
-    pianoModeBtn.classList.add('midi-unavailable');
-    pianoModeOptions.style.display = 'none';
+    // Completely hide the entire piano mode control on mobile
+    const pianoModeControl = pianoModeBtn.closest('.piano-mode-control');
+    if (pianoModeControl) {
+      pianoModeControl.style.display = 'none';
+    }
     gameSettings.pianoMode.enabled = false;
     gameSettings.pianoMode.active = false;
     updateClefButtonsForPianoMode(false);
     return;
+  } else {
+    // Ensure piano mode control is visible on non-mobile devices
+    const pianoModeControl = pianoModeBtn.closest('.piano-mode-control');
+    if (pianoModeControl) {
+      pianoModeControl.style.display = '';
+    }
   }
   
   // Check if MIDI integration is available and has connected devices
@@ -396,6 +403,14 @@ function updateClefButtons() {
 document.addEventListener('DOMContentLoaded', function() {
   loadSettings();
   loadHighScores(); // Load high scores
+  
+  // Hide MIDI-related elements on mobile devices
+  if (isMobileDevice()) {
+    const midiDeviceOptionGroup = document.getElementById('midiDeviceOptionGroup');
+    if (midiDeviceOptionGroup) {
+      midiDeviceOptionGroup.style.display = 'none';
+    }
+  }
   
   // Initialize Piano Mode UI
   updatePianoModeUI();

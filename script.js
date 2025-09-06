@@ -1675,11 +1675,11 @@ function getNotesForPianoModeHand(hand, clef, availableNotes) {
       return midi <= b3Midi;
     });
   } else if (clef === 'treble') {
-    // Treble clef: lowest note should be D4  
+    // Treble clef: lowest note should be C4  
     handNotes = handNotes.filter(note => {
       const midi = note.midi || scientificToMidi(note.letter, note.octave);
-      const d4Midi = scientificToMidi('D', 4);
-      return midi >= d4Midi;
+      const c4Midi = scientificToMidi('C', 4);
+      return midi >= c4Midi;
     });
   }
   
@@ -2326,8 +2326,70 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
     }
     
   } else {
-    // Wrong answer - handle differently for chords vs single notes
-    if (leftmostNote) {
+    // Wrong answer - no matching note found
+    // For piano mode chord mode, find the leftmost chord to destroy
+    let leftmostChordToDestroy = null;
+    let leftmostChordIndex = -1;
+    let minChordDistance = Infinity;
+    
+    // Find the leftmost chord respecting hand boundaries in piano mode
+    movingNotes.forEach((note, index) => {
+      // In piano mode, check if this note belongs to an active hand
+      if (pianoModeActive && currentClef === 'grand') {
+        const leftHandActive = pianoModeSettings.leftHand !== 'none';
+        const rightHandActive = pianoModeSettings.rightHand !== 'none';
+        
+        // Only consider notes from clefs that have active hands
+        const noteIsFromActiveHand = 
+          (note.clef === 'bass' && leftHandActive) || 
+          (note.clef === 'treble' && rightHandActive);
+        
+        if (!noteIsFromActiveHand) {
+          return; // Skip notes from inactive hands
+        }
+        
+        // For piano mode with chord modes, check if this is a chord in an active chord mode
+        if ((note.clef === 'bass' && pianoModeSettings.leftHand === 'chords') ||
+            (note.clef === 'treble' && pianoModeSettings.rightHand === 'chords')) {
+          if (note.isChord && note.x < minChordDistance) {
+            minChordDistance = note.x;
+            leftmostChordToDestroy = note;
+            leftmostChordIndex = index;
+          }
+        }
+      } else {
+        // Regular mode - find leftmost chord
+        if (note.isChord && note.x < minChordDistance) {
+          minChordDistance = note.x;
+          leftmostChordToDestroy = note;
+          leftmostChordIndex = index;
+        }
+      }
+    });
+    
+    // If we found a chord to destroy, destroy it
+    if (leftmostChordToDestroy && leftmostChordToDestroy.isChord) {
+      const chordId = leftmostChordToDestroy.chordId;
+      const affectedClef = leftmostChordToDestroy.clef;
+      
+      // Remove all notes in this chord
+      for (let i = movingNotes.length - 1; i >= 0; i--) {
+        if (movingNotes[i].isChord && movingNotes[i].chordId === chordId) {
+          movingNotes.splice(i, 1);
+        }
+      }
+      
+      // Reset chord progress for this chord
+      chordProgress.delete(chordId);
+      
+      // Spawn replacement chord for the affected hand/clef
+      respawnNote();
+      
+      feedback.textContent = `Wrong note! Chord deleted for ${affectedClef} clef.`;
+      feedback.style.color = '#d0021b';
+      feedback.style.fontSize = '16px';
+    } else if (leftmostNote) {
+      // Fall back to original logic for single notes
       if (leftmostNote.isChord) {
         // For chords: instantly delete the entire chord for the affected hand/clef and reset progress
         const chordId = leftmostNote.chordId;
@@ -2489,7 +2551,22 @@ if (clefSelect) {
 window.onload = function () {
   // Load settings first
   loadGameSettings();
+  
+  // Hide MIDI-related elements on mobile devices
+  if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+    const midiControlGame = document.getElementById('midiControlGame');
+    if (midiControlGame) {
+      midiControlGame.style.display = 'none';
+    }
+  }
+  
   initializeGame();
+  
+  // Hide Piano Mode controls immediately to prevent popup flash
+  const pianoModeControls = document.getElementById('pianoModeControls');
+  if (pianoModeControls) {
+    pianoModeControls.style.display = 'none';
+  }
   
   // Update clef display after DOM is ready
   updateClefDisplay();
