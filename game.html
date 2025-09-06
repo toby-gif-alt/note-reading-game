@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stave Wars</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Canvas takes center stage -->
+  <canvas id="staffCanvas" width="800" height="400"></canvas>
+  
+  <!-- Game controls moved to bottom -->
+  <div class="bottom-controls">
+    <!-- Pitch Buttons -->
+    <div class="pitch-buttons">
+      <button class="pitch-btn" data-note="A">A</button>
+      <button class="pitch-btn" data-note="B">B</button>
+      <button class="pitch-btn" data-note="C">C</button>
+      <button class="pitch-btn" data-note="D">D</button>
+      <button class="pitch-btn" data-note="E">E</button>
+      <button class="pitch-btn" data-note="F">F</button>
+      <button class="pitch-btn" data-note="G">G</button>
+    </div>
+    
+    <!-- Game info and controls -->
+    <div class="game-info">
+      <div class="game-stats">
+        <div id="score">Score: 0</div>
+        <div id="lives-container">
+          <div id="life1" class="life-icon"></div>
+          <div id="life2" class="life-icon"></div>
+          <div id="life3" class="life-icon"></div>
+        </div>
+        <div id="meteorsDestroyed">Notes Destroyed: 0</div>
+        <div id="leftHandScore" style="display: none;">Left Hand: 0</div>
+        <div id="rightHandScore" style="display: none;">Right Hand: 0</div>
+        <div id="clefDisplay">Clef selected: Treble Clef</div>
+      </div>
+      
+      <div class="control-buttons">
+        <button id="restartBtn" style="display: none;" class="control-btn">Restart Game</button>
+        <button id="menuBtn" onclick="window.location.href='menu.html'" class="control-btn">Menu</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Hidden controls -->
+  <div class="controls">
+    <select id="clefSelect" style="display: none;">
+      <option value="treble">Treble</option>
+      <option value="bass">Bass</option>
+      <option value="grand">Grand Stave</option>
+    </select>
+  </div>
+  <div class="audio-controls">
+    <div class="audio-control">
+      <label>Music:</label>
+      <input type="range" id="musicVolume" min="0" max="1" step="0.1" value="1">
+      <button id="musicToggle">🎵</button>
+    </div>
+    <div class="audio-control">
+      <label>Effects:</label>
+      <input type="range" id="effectsVolume" min="0" max="1" step="0.1" value="1">
+      <button id="effectsToggle">🔊</button>
+    </div>
+    <div class="midi-control">
+      <label>MIDI Device:</label>
+      <select id="midiDeviceSelector" disabled>
+        <option value="">Select MIDI Device</option>
+      </select>
+      <div id="midiStatus" class="midi-status info">Checking for MIDI...</div>
+    </div>
+  </div>
+  
+
+  <div class="input-row" style="display: none;">
+    <div id="feedback"></div>
+  </div>
+  
+  <!-- Level progression popup -->
+  <div id="levelPopup" class="level-popup" style="display: none;">
+    Level 2!
+  </div>
+
+  <!-- Piano Mode Controls -->
+  <div id="pianoModeControls" class="piano-mode-controls" style="display: none;">
+    <div class="piano-mode-header">
+      <h3>🎹 Piano Mode</h3>
+    </div>
+    <div class="piano-mode-options">
+      <div class="piano-option">
+        <label>Left Hand (Bass):</label>
+        <select id="leftHandMode">
+          <option value="none">None</option>
+          <option value="melody">Melody</option>
+          <option value="chords">Chords</option>
+        </select>
+      </div>
+      <div class="piano-option">
+        <label>Right Hand (Treble):</label>
+        <select id="rightHandMode">
+          <option value="none">None</option>
+          <option value="melody">Melody</option>
+          <option value="chords">Chords</option>
+        </select>
+      </div>
+      <div class="piano-option">
+        <label>
+          <input type="checkbox" id="pianoGrandStaffForce" checked>
+          <span>Force Grand Staff</span>
+        </label>
+      </div>
+    </div>
+  </div>
+  
+
+  
+  <script src="script.js"></script>
+  <script type="module" src="dist/midi/midi-integration.js"></script>
+</body>
+</html>

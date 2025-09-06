@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stave Wars - Menu</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu-style.css">
+</head>
+<body>
+  <div class="menu-container">
+    <h1>Stave Wars</h1>
+    
+    <!-- Staff Selection with Ledger Lines Combined -->
+    <div class="staff-selection-section">
+      <h2>Select Musical Clef:</h2>
+      <div class="clef-options">
+        <button id="trebleClefBtn" class="clef-btn active" data-clef="treble">
+          <div class="clef-symbol">
+            <img src="images/treble.png" alt="𝄞" class="clef-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+            <span class="clef-fallback" style="display: none;">𝄞</span>
+          </div>
+          <span class="clef-name">Treble Clef</span>
+        </button>
+        <button id="bassClefBtn" class="clef-btn" data-clef="bass">
+          <div class="clef-symbol">
+            <img src="images/bass.png" alt="𝄢" class="clef-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+            <span class="clef-fallback" style="display: none;">𝄢</span>
+          </div>
+          <span class="clef-name">Bass Clef</span>
+        </button>
+        <button id="grandClefBtn" class="clef-btn" data-clef="grand">
+          <div class="clef-symbol grand-clef-symbol">
+            <div class="grand-clef-images">
+              <img src="images/treble.png" alt="𝄞" class="clef-image grand-treble" onerror="this.style.display='none';">
+              <img src="images/bass.png" alt="𝄢" class="clef-image grand-bass" onerror="this.style.display='none';">
+            </div>
+            <span class="clef-fallback" style="display: none;">𝄞𝄢</span>
+          </div>
+          <span class="clef-name">Grand Stave</span>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Main Game Controls Grid -->
+    <div class="game-controls-grid">
+      <!-- Top Row: Ledger Line Dropdown -->
+      <div class="ledger-dropdown-section">
+        <label for="ledgerLineSelect">Difficulty:</label>
+        <select id="ledgerLineSelect" class="ledger-select">
+          <option value="0">Easy (No Ledger Lines)</option>
+          <option value="1">Medium (1 Line Each Side)</option>
+          <option value="2">Hard (2 Lines Each Side)</option>
+          <option value="3">Expert (3 Lines Each Side)</option>
+          <option value="4">Master (4 Lines Each Side)</option>
+        </select>
+      </div>
+      
+      <!-- Middle Row: Tutorial, Start Game, Piano Mode -->
+      <div class="main-controls-row">
+        <button id="tutorialBtn" class="control-btn tutorial-btn">
+          <img src="images/info.png" alt="Tutorial" class="button-icon">
+          Tutorial
+        </button>
+        
+        <button id="startGameBtn" class="control-btn start-btn-main">
+          Start Game
+        </button>
+        
+        <div class="piano-mode-control">
+          <button id="pianoModeBtn" class="control-btn piano-mode-btn-compact">
+            <span class="piano-icon">🎹</span>
+            <span class="piano-text">Piano Mode</span>
+            <span class="piano-status" id="pianoModeStatus">MIDI Required</span>
+          </button>
+          
+          <!-- Piano Mode Options (hidden by default) -->
+          <div id="pianoModeOptions" class="piano-mode-options" style="display: none;">
+            <div class="piano-options-header">
+              <span class="piano-options-title">Piano Mode Settings</span>
+              <button id="pianoModeCloseBtn" class="piano-mode-close-btn">&times;</button>
+            </div>
+            <div class="piano-options-grid">
+              <div class="piano-option">
+                <label>
+                  <input type="checkbox" id="pianoModeActiveToggle">
+                  <span class="option-label">Enable Piano Mode</span>
+                  <span class="option-description">Activate piano keyboard input</span>
+                </label>
+              </div>
+              
+              <div class="piano-option">
+                <label>
+                  <input type="checkbox" id="strictModeToggle">
+                  <span class="option-label">Strict Mode</span>
+                  <span class="option-description">Exact octave matching required</span>
+                </label>
+              </div>
+              
+              <div class="piano-option">
+                <label for="leftHandSelect" class="dropdown-label">
+                  <span class="option-label">Left Hand (Bass Clef):</span>
+                </label>
+                <select id="leftHandSelect" class="hand-select">
+                  <option value="none">None</option>
+                  <option value="melody">Melody</option>
+                  <option value="chords">Chords</option>
+                </select>
+              </div>
+              
+              <div class="piano-option">
+                <label for="rightHandSelect" class="dropdown-label">
+                  <span class="option-label">Right Hand (Treble Clef):</span>
+                </label>
+                <select id="rightHandSelect" class="hand-select">
+                  <option value="none">None</option>
+                  <option value="melody">Melody</option>
+                  <option value="chords">Chords</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Bottom Row: High Scores -->
+      <div class="high-scores-section">
+        <h3>High Scores</h3>
+        <div class="scores-grid">
+          <div class="score-item">
+            <span class="score-label">Treble</span>
+            <span id="trebleHighScoreDisplay" class="score-number">0</span>
+          </div>
+          <div class="score-item">
+            <span class="score-label">Bass</span>
+            <span id="bassHighScoreDisplay" class="score-number">0</span>
+          </div>
+          <div class="score-item">
+            <span class="score-label">Grand</span>
+            <span id="grandHighScoreDisplay" class="score-number">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tutorial Modal -->
+    <div id="tutorialModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>How to Play</h2>
+        <div class="tutorial-content">
+          <div class="tutorial-text">
+            <p><strong>Objective:</strong> Destroy notes by identifying the correct musical pitches!</p>
+            <ul>
+              <li>Notes will move from right to left toward the clef</li>
+              <li>Type the correct note letter (A, B, C, D, E, F, G) or click the pitch buttons</li>
+              <li>If a note reaches the clef, you lose a life</li>
+              <li>Wrong answers cause an explosion on the clef and you lose a life</li>
+              <li>Correct answers create a laser from your ship to destroy the note</li>
+              <li>Every 10 correct answers advances you to the next level with faster notes</li>
+              <li>You start with 3 lives and get bonus lives at levels 4 and 8</li>
+              <li>Survive as long as possible and get the highest score!</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Options Modal -->
+    <div id="optionsModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Game Options</h2>
+        <div class="options-content">
+          <div class="option-group">
+            <label>
+              <input type="checkbox" id="musicToggle" checked>
+              Background Music
+            </label>
+          </div>
+          
+          <div class="option-group">
+            <label>
+              <input type="checkbox" id="soundEffectsToggle" checked>
+              Sound Effects
+            </label>
+          </div>
+          
+          <div class="option-group">
+            <label for="midiDeviceMenuSelector">MIDI Device:</label>
+            <select id="midiDeviceMenuSelector" disabled>
+              <option value="">Select MIDI Device</option>
+            </select>
+            <div id="midiStatusMenu" class="midi-status-menu info">Checking for MIDI...</div>
+          </div>
+          
+          <button id="saveOptionsBtn" class="menu-btn">Save Settings</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- High Scores Modal -->
+  <div id="highScoresModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>High Scores</h2>
+      <div class="highscores-content">
+        <div class="clef-scores">
+          <div class="score-section">
+            <h3>Treble Clef</h3>
+            <div id="trebleHighScore" class="score-value">0</div>
+          </div>
+          <div class="score-section">
+            <h3>Bass Clef</h3>
+            <div id="bassHighScore" class="score-value">0</div>
+          </div>
+          <div class="score-section">
+            <h3>Grand Stave</h3>
+            <div id="grandHighScore" class="score-value">0</div>
+          </div>
+        </div>
+        <button id="resetHighScoresBtn" class="menu-btn reset-btn">
+          Reset High Scores
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pre-game Modal -->
+  <div id="preGameModal" class="modal">
+    <div class="modal-content">
+      <h2>Ready to Play?</h2>
+      <div class="pregame-content">        
+        <div class="pregame-buttons">
+          <button id="returnToMenuBtn" class="menu-btn">
+            Return to Menu
+          </button>
+          
+          <button id="showNoteHelperBtn" class="menu-btn">
+            Note Helper
+          </button>
+          
+          <button id="actualStartGameBtn" class="menu-btn start-btn">
+            Start Game
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Note Helper Modal -->
+  <div id="noteHelperModal" class="modal">
+    <div class="modal-content note-helper-content">
+      <span class="close">&times;</span>
+      <h2>Musical Note Reference</h2>
+      <div class="note-helper-image">
+        <img src="images/info.png" alt="Note Reading Reference" class="helper-image">
+      </div>
+    </div>
+  </div>
+
+  <script src="menu.js"></script>
+  <script type="module" src="dist/midi/midi-menu-integration.js"></script>
+</body>
+</html>

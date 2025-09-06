@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MIDI Tests - Note Reading Game</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .test-results {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .test-passed { color: #4CAF50; }
+    .test-failed { color: #f44336; }
+    .test-item {
+      padding: 8px;
+      margin: 4px 0;
+      border-left: 4px solid #ddd;
+      background: #f9f9f9;
+    }
+    .test-item.passed { border-left-color: #4CAF50; }
+    .test-item.failed { border-left-color: #f44336; }
+    button {
+      background: #2196F3;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 10px 5px 10px 0;
+    }
+    button:hover { background: #1976D2; }
+    #console {
+      background: #222;
+      color: #fff;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 14px;
+      height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎹 MIDI System Tests</h1>
+  
+  <div class="test-results">
+    <h2>Test Results</h2>
+    <button onclick="runTests()">Run All Tests</button>
+    <button onclick="clearConsole()">Clear Console</button>
+    
+    <div id="testResults"></div>
+    <div id="console"></div>
+  </div>
+
+  <script type="module">
+    import { midiManager } from './dist/midi/midi-manager.js';
+    import { scientificToMidi, midiNoteToMapping, isNaturalNote } from './dist/midi/midi-utils.js';
+
+    let testResults = [];
+    let passedTests = 0;
+    let failedTests = 0;
+
+    function log(message, type = 'info') {
+      const console = document.getElementById('console');
+      const timestamp = new Date().toLocaleTimeString();
+      const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+      console.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+      console.scrollTop = console.scrollHeight;
+    }
+
+    function assert(condition, message) {
+      if (condition) {
+        passedTests++;
+        testResults.push({ message, passed: true });
+        log(`PASS: ${message}`, 'success');
+      } else {
+        failedTests++;
+        testResults.push({ message, passed: false });
+        log(`FAIL: ${message}`, 'error');
+        throw new Error(message);
+      }
+    }
+
+    function assertEqual(actual, expected, message) {
+      if (actual === expected) {
+        passedTests++;
+        testResults.push({ message, passed: true });
+        log(`PASS: ${message}`, 'success');
+      } else {
+        failedTests++;
+        const errorMsg = `${message} - Expected: ${expected}, Got: ${actual}`;
+        testResults.push({ message: errorMsg, passed: false });
+        log(`FAIL: ${errorMsg}`, 'error');
+        throw new Error(errorMsg);
+      }
+    }
+
+    async function runTest(name, testFunction) {
+      try {
+        log(`Running test: ${name}`);
+        await testFunction();
+        log(`✅ ${name} completed successfully`);
+      } catch (error) {
+        log(`❌ ${name} failed: ${error.message}`, 'error');
+      }
+    }
+
+    async function runTests() {
+      testResults = [];
+      passedTests = 0;
+      failedTests = 0;
+      
+      document.getElementById('testResults').innerHTML = '';
+      document.getElementById('console').textContent = '';
+      
+      log('🎹 Starting MIDI Tests...');
+
+      // Test 1: MIDI Utility Functions
+      await runTest('MIDI Utility Functions', () => {
+        // Test scientific notation to MIDI conversion
+        assertEqual(scientificToMidi('C', 4), 60, 'C4 should be MIDI note 60');
+        assertEqual(scientificToMidi('A', 4), 69, 'A4 should be MIDI note 69');
+        assertEqual(scientificToMidi('G', 5), 79, 'G5 should be MIDI note 79');
+
+        // Test MIDI to note mapping
+        const c4Mapping = midiNoteToMapping(60);
+        assertEqual(c4Mapping.noteName, 'C', 'MIDI 60 should be note C');
+        assertEqual(c4Mapping.octave, 4, 'MIDI 60 should be octave 4');
+        assertEqual(c4Mapping.scientific, 'C4', 'MIDI 60 should be C4 scientific');
+
+        // Test natural note detection
+        assert(isNaturalNote(60), 'C4 (60) should be a natural note');
+        assert(!isNaturalNote(61), 'C#4 (61) should not be a natural note');
+        assert(isNaturalNote(69), 'A4 (69) should be a natural note');
+      });
+
+      // Test 2: MIDI Manager Initialization
+      await runTest('MIDI Manager Initialization', async () => {
+        const status = midiManager.getStatus();
+        assert(typeof status.isSupported === 'boolean', 'isSupported should be boolean');
+        assert(typeof status.isEnabled === 'boolean', 'isEnabled should be boolean');
+        assert(Array.isArray(status.connectedDevices), 'connectedDevices should be array');
+      });
+
+      // Test 3: Device Management
+      await runTest('Device Management', () => {
+        const devices = midiManager.getConnectedDevices();
+        assert(Array.isArray(devices), 'getConnectedDevices should return array');
+        
+        const selectedDevice = midiManager.getSelectedDevice();
+        assert(selectedDevice === null || typeof selectedDevice === 'object', 
+               'getSelectedDevice should return null or object');
+      });
+
+      // Test 4: Event System
+      await runTest('Event System', (done) => {
+        return new Promise((resolve) => {
+          let eventFired = false;
+          
+          midiManager.on('statusChanged', (status) => {
+            eventFired = true;
+            assert(typeof status === 'object', 'Status change event should provide status object');
+            resolve();
+          });
+
+          // Trigger a status change
+          setTimeout(() => {
+            midiManager.setEnabled(true);
+            setTimeout(() => {
+              if (!eventFired) {
+                log('Warning: Status change event not fired within timeout');
+              }
+              resolve();
+            }, 1000);
+          }, 100);
+        });
+      });
+
+      // Test 5: Integration Functions
+      await runTest('Integration Functions', () => {
+        assert(typeof window.handleDeviceSelection === 'function', 
+               'handleDeviceSelection should be available globally');
+        
+        // Test with invalid device ID - should not crash
+        try {
+          window.handleDeviceSelection('invalid-device-id');
+          assert(true, 'handleDeviceSelection with invalid ID should not crash');
+        } catch (error) {
+          assert(false, 'handleDeviceSelection should handle invalid IDs gracefully');
+        }
+      });
+
+      // Test 6: Note Input Callback
+      await runTest('Note Input Callback', () => {
+        return new Promise((resolve) => {
+          let callbackReceived = false;
+          
+          const callback = (mapping) => {
+            callbackReceived = true;
+            assert(typeof mapping === 'object', 'Callback should receive mapping object');
+            assert(typeof mapping.noteName === 'string', 'Mapping should have noteName');
+            assert(typeof mapping.octave === 'number', 'Mapping should have octave');
+          };
+
+          midiManager.onNoteInput(callback);
+          
+          // Clean up callback
+          setTimeout(() => {
+            midiManager.removeNoteInputCallback(callback);
+            resolve();
+          }, 500);
+        });
+      });
+
+      // Display results
+      displayResults();
+    }
+
+    function displayResults() {
+      const resultsDiv = document.getElementById('testResults');
+      const totalTests = passedTests + failedTests;
+      
+      log(`\n📊 Test Summary: ${passedTests} passed, ${failedTests} failed out of ${totalTests} total`);
+      
+      let html = `<h3>Summary: ${passedTests} passed, ${failedTests} failed</h3>`;
+      
+      testResults.forEach(result => {
+        html += `<div class="test-item ${result.passed ? 'passed' : 'failed'}">
+          ${result.passed ? '✅' : '❌'} ${result.message}
+        </div>`;
+      });
+      
+      resultsDiv.innerHTML = html;
+
+      if (failedTests === 0) {
+        log('🎉 All tests passed!', 'success');
+      } else {
+        log('❌ Some tests failed. See results above.', 'error');
+      }
+    }
+
+    function clearConsole() {
+      document.getElementById('console').textContent = '';
+    }
+
+    // Make functions globally available
+    window.runTests = runTests;
+    window.clearConsole = clearConsole;
+    window.log = log;
+
+    // Auto-run tests after a short delay to allow MIDI system to initialize
+    setTimeout(() => {
+      log('🎹 MIDI Test Suite Loaded. Click "Run All Tests" to begin.');
+      log('Note: Some tests may show warnings if no MIDI devices are connected.');
+    }, 1000);
+  </script>
+</body>
+</html>

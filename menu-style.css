@@ -1,0 +1,1668 @@
+/* Menu specific styles */
+.menu-container {
+  min-height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-image: url('images/background.jpg');
+  background-size: cover;
+  background-position: center;
+  background-blend-mode: overlay;
+  overflow-y: auto;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.menu-container h1 {
+  color: #FFD700;
+  font-size: 4.5rem;
+  font-weight: bold;
+  text-shadow: 
+    /* Dark border/outline effects */
+    -2px -2px 0 #000,
+    2px -2px 0 #000,
+    -2px 2px 0 #000,
+    2px 2px 0 #000,
+    -3px 0 0 #000,
+    3px 0 0 #000,
+    0 -3px 0 #000,
+    0 3px 0 #000,
+    /* Glow effects (reduced intensity) */
+    0 0 5px #FFD700,
+    0 0 10px #FFD700,
+    0 0 15px #FFD700,
+    0 0 20px #FF8C00,
+    0 0 35px #FF8C00,
+    0 0 40px #FF8C00,
+    2px 2px 8px rgba(0, 0, 0, 0.8);
+  margin-bottom: 2rem;
+  font-family: 'Arial Black', Arial, sans-serif;
+  letter-spacing: 3px;
+  transform: perspective(300px) rotateX(25deg);
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    text-shadow: 
+      /* Dark border/outline effects */
+      -2px -2px 0 #000,
+      2px -2px 0 #000,
+      -2px 2px 0 #000,
+      2px 2px 0 #000,
+      -3px 0 0 #000,
+      3px 0 0 #000,
+      0 -3px 0 #000,
+      0 3px 0 #000,
+      /* Glow effects */
+      0 0 5px #FFD700,
+      0 0 10px #FFD700,
+      0 0 15px #FFD700,
+      0 0 20px #FF8C00,
+      0 0 35px #FF8C00,
+      0 0 40px #FF8C00,
+      2px 2px 8px rgba(0, 0, 0, 0.8);
+  }
+  to {
+    text-shadow: 
+      /* Dark border/outline effects */
+      -2px -2px 0 #000,
+      2px -2px 0 #000,
+      -2px 2px 0 #000,
+      2px 2px 0 #000,
+      -3px 0 0 #000,
+      3px 0 0 #000,
+      0 -3px 0 #000,
+      0 3px 0 #000,
+      /* Enhanced glow effects */
+      0 0 10px #FFD700,
+      0 0 20px #FFD700,
+      0 0 30px #FFD700,
+      0 0 40px #FF8C00,
+      0 0 60px #FF8C00,
+      0 0 70px #FF8C00,
+      2px 2px 8px rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* Staff Selection Section (formerly clef-selection) */
+.staff-selection-section {
+  margin-bottom: 2rem;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 1.5rem;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.staff-selection-section h2 {
+  color: #333;
+  font-size: 1.3rem;
+  margin: 0 0 1rem 0;
+  text-align: center;
+}
+
+/* Game Controls Grid Layout */
+.game-controls-grid {
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Ledger Line Dropdown Section */
+.ledger-dropdown-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 1rem;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.ledger-dropdown-section label {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #333;
+}
+
+.ledger-select {
+  padding: 0.75rem 1rem;
+  border: 2px solid #28a745;
+  border-radius: 8px;
+  background: white;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #28a745;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 250px;
+  text-align: center;
+}
+
+.ledger-select:hover {
+  background: #28a745;
+  color: white;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.ledger-select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.2);
+}
+
+/* Main Controls Row - 3 column grid */
+.main-controls-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 1.5rem;
+  align-items: center;
+  justify-items: center;
+}
+
+/* Control Buttons */
+.control-btn {
+  padding: 1rem 1.5rem;
+  font-size: 1.1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 150px;
+}
+
+.control-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Tutorial Button */
+.tutorial-btn {
+  background: linear-gradient(45deg, #17a2b8, #138496);
+  color: white;
+}
+
+.tutorial-btn:hover {
+  background: linear-gradient(45deg, #138496, #117a8b);
+  color: white;
+}
+
+/* Start Game Button - Bigger and Central */
+.start-btn-main {
+  background: linear-gradient(45deg, #28a745, #20c997);
+  color: white;
+  font-size: 1.6rem;
+  padding: 1.5rem 3rem;
+  min-width: 250px;
+  box-shadow: 0 6px 25px rgba(40, 167, 69, 0.4);
+}
+
+.start-btn-main:hover {
+  background: linear-gradient(45deg, #218838, #1ba085);
+  color: white;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px rgba(40, 167, 69, 0.5);
+}
+
+/* Piano Mode Control */
+.piano-mode-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.piano-mode-btn-compact {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border: 2px solid #6c63ff;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+  min-width: 150px;
+  justify-content: center;
+}
+
+.piano-mode-btn-compact:hover:not(:disabled) {
+  border-color: #5a52d5;
+  background: #f8f7ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
+}
+
+.piano-mode-btn-compact.active {
+  border-color: #5a52d5;
+  background: linear-gradient(135deg, #6c63ff, #5a52d5);
+  color: white;
+  box-shadow: 0 4px 15px rgba(108, 99, 255, 0.4);
+}
+
+.piano-mode-btn-compact.active .piano-status {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.piano-mode-btn-compact:disabled {
+  border-color: #ccc;
+  background: #f5f5f5;
+  color: #999;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* New class for when MIDI is unavailable but button is still clickable */
+.piano-mode-btn-compact.midi-unavailable {
+  border-color: #d4a574;
+  background: #fdf6e3;
+  color: #8b4513;
+  cursor: pointer;
+  opacity: 1;
+  transition: all 0.3s ease;
+}
+
+.piano-mode-btn-compact.midi-unavailable:hover {
+  border-color: #c8956d;
+  background: #f9f0dc;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(212, 165, 116, 0.3);
+}
+
+.piano-mode-btn-compact.midi-unavailable .piano-text {
+  font-weight: bold;
+  color: #8b4513;
+}
+
+.piano-mode-btn-compact.midi-unavailable .piano-status {
+  font-size: 0.75rem;
+  color: #a0522d;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.piano-mode-btn-compact .piano-text {
+  font-weight: bold;
+  color: #333;
+}
+
+/* Piano Mode button text: black by default, green when enabled */
+.piano-mode-btn-compact.active .piano-text {
+  color: #28a745; /* Green color when Piano Mode is active */
+}
+
+.piano-mode-btn-compact .piano-status {
+  font-size: 0.75rem;
+  color: #666;
+  font-style: italic;
+}
+
+/* High Scores Section */
+.high-scores-section {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 15px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+
+.high-scores-section h3 {
+  margin: 0 0 1rem 0;
+  color: #4378ff;
+  font-size: 1.3rem;
+}
+
+/* Keep existing clef-options, scores-grid, etc. but update as needed */
+
+.clef-options {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.clef-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 120px;
+}
+
+.clef-btn:hover {
+  border-color: #007bff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+}
+
+.clef-btn.active {
+  border-color: #007bff;
+  background: #e3f2fd;
+  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+}
+
+.clef-symbol {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  color: #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.clef-image {
+  width: 32px;
+  height: 48px;
+  object-fit: contain;
+  /* Remove filter to show original image colors */
+}
+
+.clef-image.small {
+  width: 20px;
+  height: 30px;
+}
+
+.grand-clef-images {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+}
+
+.grand-clef-images .clef-image {
+  width: 28px;
+  height: 42px;
+}
+
+.clef-fallback {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.clef-name {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #555;
+  text-align: center;
+}
+
+/* Hide old layout elements that are now integrated into the grid */
+.ledger-line-selection,
+.piano-mode-section,
+.high-scores-display,
+.menu-buttons {
+  display: none;
+}
+
+.ledger-line-selection h2 {
+  color: #333;
+  font-size: 1.3rem;
+  margin: 0 0 1rem 0;
+  text-align: center;
+}
+
+.ledger-options {
+  display: flex;
+  justify-content: center;
+}
+
+.difficulty-btn {
+  padding: 1rem 2rem;
+  border: 2px solid #28a745;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #28a745;
+  min-width: 250px;
+}
+
+.difficulty-btn:hover {
+  background: #28a745;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+/* Difficulty level color variations - green to red gradient */
+.difficulty-btn[data-level="0"] {
+  border-color: #28a745;
+  color: #28a745;
+}
+
+.difficulty-btn[data-level="0"]:hover {
+  background: #28a745;
+  color: white;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.difficulty-btn[data-level="1"] {
+  border-color: #6cb04a;
+  color: #6cb04a;
+}
+
+.difficulty-btn[data-level="1"]:hover {
+  background: #6cb04a;
+  color: white;
+  box-shadow: 0 4px 15px rgba(108, 176, 74, 0.3);
+}
+
+.difficulty-btn[data-level="2"] {
+  border-color: #ffc107;
+  color: #ffc107;
+}
+
+.difficulty-btn[data-level="2"]:hover {
+  background: #ffc107;
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+}
+
+.difficulty-btn[data-level="3"] {
+  border-color: #fd7e14;
+  color: #fd7e14;
+}
+
+.difficulty-btn[data-level="3"]:hover {
+  background: #fd7e14;
+  color: white;
+  box-shadow: 0 4px 15px rgba(253, 126, 20, 0.3);
+}
+
+.difficulty-btn[data-level="4"] {
+  border-color: #dc3545;
+  color: #dc3545;
+}
+
+.difficulty-btn[data-level="4"]:hover {
+  background: #dc3545;
+  color: white;
+  box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+}
+
+.difficulty-label {
+  display: block;
+}
+
+/* Hard Mode Selection */
+.hard-mode-selection {
+  margin: 1.5rem 0;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.hard-mode-selection h3 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-align: center;
+}
+
+.difficulty-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #333;
+  gap: 0.5rem;
+}
+
+.difficulty-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  cursor: pointer;
+}
+
+/* High Scores Modal */
+.highscores-content {
+  text-align: center;
+}
+
+.clef-scores {
+  display: flex;
+  justify-content: space-around;
+  margin: 2rem 0;
+  gap: 1rem;
+}
+
+.score-section {
+  flex: 1;
+  padding: 1rem;
+  background: rgba(67, 120, 255, 0.1);
+  border-radius: 8px;
+  border: 2px solid #4378ff;
+}
+
+.score-section h3 {
+  margin: 0 0 0.5rem 0;
+  color: #4378ff;
+  font-size: 1.1rem;
+}
+
+.score-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #333;
+}
+
+.reset-btn {
+  background: #dc3545 !important;
+  color: white !important;
+}
+
+.reset-btn:hover {
+  background: #c82333 !important;
+  transform: translateY(-2px);
+}
+
+/* High scores display - always visible */
+.high-scores-display {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 15px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.high-scores-display h3 {
+  margin: 0 0 1rem 0;
+  color: #4378ff;
+  font-size: 1.3rem;
+  text-align: center;
+}
+
+.scores-grid {
+  display: flex;
+  justify-content: space-around;
+  gap: 1rem;
+}
+
+.score-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.score-label {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.score-number {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #4378ff;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.menu-btn {
+  padding: 1rem 2rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.menu-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.start-btn {
+  background: linear-gradient(45deg, #28a745, #20c997);
+  color: white;
+  font-size: 1.4rem;
+  padding: 1.2rem 2.5rem;
+}
+
+.start-btn:hover {
+  background: linear-gradient(45deg, #218838, #1ba085);
+  color: white;
+}
+
+.button-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+/* Modal styles */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.3); /* More transparent background */
+}
+
+.modal-content {
+  background-color: rgba(254, 254, 254, 0.95); /* Slightly transparent for visibility */
+  margin: 5% auto;
+  padding: 2rem;
+  border: none;
+  border-radius: 15px;
+  width: 90%;
+  max-width: 600px;
+  position: relative;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.close {
+  color: #aaa;
+  float: right;
+  font-size: 2rem;
+  font-weight: bold;
+  position: absolute;
+  right: 1rem;
+  top: 1rem;
+  cursor: pointer;
+}
+
+.close:hover,
+.close:focus {
+  color: #000;
+  text-decoration: none;
+}
+
+.tutorial-content {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.tutorial-image {
+  width: 200px;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.tutorial-text {
+  flex: 1;
+}
+
+.tutorial-text ul {
+  text-align: left;
+  line-height: 1.6;
+}
+
+.tutorial-text li {
+  margin-bottom: 0.5rem;
+}
+
+.options-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.option-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.option-group label {
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.option-group input[type="checkbox"] {
+  transform: scale(1.2);
+}
+
+.option-group select {
+  padding: 0.5rem;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+}
+
+/* Responsive design for new grid layout */
+@media (max-width: 768px) {
+  .game-controls-grid {
+    gap: 1rem;
+    padding: 0 1rem;
+  }
+  
+  .main-controls-row {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 1rem;
+  }
+  
+  .start-btn-main {
+    font-size: 1.3rem;
+    padding: 1.2rem 2rem;
+    min-width: 200px;
+  }
+  
+  .control-btn {
+    min-width: 120px;
+    padding: 0.8rem 1.2rem;
+    font-size: 1rem;
+  }
+  
+  .ledger-select {
+    min-width: 200px;
+    font-size: 0.9rem;
+  }
+  
+  .staff-selection-section {
+    padding: 1rem;
+  }
+  
+  .clef-options {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .clef-btn {
+    min-width: 100px;
+    padding: 0.8rem;
+  }
+}
+    margin-bottom: 1.5rem;
+  }
+  
+  .clef-selection, .hard-mode-selection, .high-scores-display {
+    margin-bottom: 1.2rem;
+    padding: 1.3rem;
+  }
+  
+  .menu-buttons {
+    gap: 1.2rem;
+  }
+}
+
+@media (max-height: 800px) {
+  .menu-container h1 {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+  
+  .clef-selection, .hard-mode-selection, .high-scores-display {
+    margin-bottom: 1rem;
+    padding: 1.2rem;
+  }
+  
+  .menu-buttons {
+    gap: 1rem;
+  }
+  
+  .start-btn {
+    font-size: 1.3rem;
+    padding: 1.1rem 2.3rem;
+  }
+}
+
+@media (max-height: 700px) {
+  .menu-container h1 {
+    font-size: 2.8rem;
+    margin-bottom: 0.8rem;
+  }
+  
+  .clef-selection, .hard-mode-selection, .high-scores-display {
+    padding: 1rem;
+    margin-bottom: 0.8rem;
+  }
+  
+  .menu-buttons {
+    gap: 0.9rem;
+  }
+  
+  .menu-btn {
+    padding: 0.8rem 1.5rem;
+    font-size: 1rem;
+  }
+  
+  .start-btn {
+    font-size: 1.2rem;
+    padding: 1rem 2rem;
+  }
+}
+
+@media (max-height: 650px) {
+  .menu-container h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .clef-selection, .hard-mode-selection, .high-scores-display {
+    padding: 0.9rem;
+    margin-bottom: 0.7rem;
+  }
+  
+  .menu-buttons {
+    gap: 0.8rem;
+  }
+  
+  .menu-btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+  }
+  
+  .start-btn {
+    font-size: 1.1rem;
+    padding: 0.9rem 1.8rem;
+  }
+}
+
+@media (max-height: 580px) {
+  .menu-container h1 {
+    font-size: 2.2rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .clef-selection, .hard-mode-selection, .high-scores-display {
+    padding: 0.8rem;
+    margin-bottom: 0.6rem;
+  }
+  
+  .menu-buttons {
+    gap: 0.7rem;
+  }
+  
+  .menu-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+  }
+  
+  .start-btn {
+    font-size: 1rem;
+    padding: 0.8rem 1.5rem;
+  }
+}
+
+/* Mobile landscape orientation - more comprehensive */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+  .menu-container {
+    padding: 0.3rem;
+    justify-content: flex-start;
+    overflow-y: auto;
+    min-height: auto;
+  }
+  
+  .menu-container h1 {
+    font-size: 1.8rem;
+    margin-bottom: 0.3rem;
+    transform: perspective(300px) rotateX(15deg); /* Reduce 3D effect */
+  }
+  
+  .clef-selection, .ledger-line-selection, .high-scores-display {
+    padding: 0.6rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .clef-selection h2, .ledger-line-selection h2 {
+    font-size: 1rem;
+    margin-bottom: 0.6rem;
+  }
+  
+  .high-scores-display h3 {
+    font-size: 1rem;
+    margin-bottom: 0.6rem;
+  }
+  
+  .clef-options {
+    gap: 0.5rem;
+  }
+  
+  .clef-btn {
+    padding: 0.5rem;
+    min-width: 80px;
+  }
+  
+  .clef-symbol {
+    font-size: 1.3rem;
+    margin-bottom: 0.2rem;
+  }
+  
+  .clef-name {
+    font-size: 0.7rem;
+  }
+  
+  .difficulty-btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.8rem;
+    min-width: 180px;
+  }
+  
+  .scores-grid {
+    gap: 0.5rem;
+  }
+  
+  .score-number {
+    font-size: 1.3rem;
+  }
+  
+  .score-label {
+    font-size: 0.8rem;
+  }
+  
+  .menu-buttons {
+    gap: 0.5rem;
+  }
+  
+  .pregame-buttons {
+    flex-direction: row;
+    gap: 0.8rem;
+  }
+  
+  .menu-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.75rem;
+    min-width: 100px;
+  }
+  
+  .start-btn {
+    font-size: 0.85rem;
+    padding: 0.6rem 1.2rem;
+  }
+  
+  .modal-content {
+    margin: 2% auto;
+    padding: 0.8rem;
+    max-height: 95vh;
+    overflow-y: auto;
+  }
+}
+
+/* Ultra-compact landscape for very small phones */
+@media screen and (orientation: landscape) and (max-height: 400px) {
+  .menu-container {
+    padding: 0.2rem;
+  }
+  
+  .menu-container h1 {
+    font-size: 1.5rem;
+    margin-bottom: 0.2rem;
+  }
+  
+  .clef-selection, .ledger-line-selection, .high-scores-display {
+    padding: 0.4rem;
+    margin-bottom: 0.3rem;
+  }
+  
+  .clef-selection h2, .ledger-line-selection h2 {
+    font-size: 0.9rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .high-scores-display h3 {
+    font-size: 0.9rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .clef-btn {
+    padding: 0.3rem;
+    min-width: 65px;
+  }
+  
+  .clef-symbol {
+    font-size: 1.1rem;
+    margin-bottom: 0.1rem;
+  }
+  
+  .clef-name {
+    font-size: 0.65rem;
+  }
+  
+  .difficulty-btn {
+    padding: 0.4rem 1rem;
+    font-size: 0.75rem;
+    min-width: 160px;
+  }
+  
+  .score-number {
+    font-size: 1.1rem;
+  }
+  
+  .score-label {
+    font-size: 0.75rem;
+  }
+  
+  .menu-btn {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.7rem;
+    min-width: 85px;
+  }
+  
+  .start-btn {
+    font-size: 0.8rem;
+    padding: 0.5rem 1rem;
+  }
+  
+  .menu-buttons {
+    gap: 0.4rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .menu-container h1 {
+    font-size: 2.2rem;
+  }
+  
+  .menu-btn {
+    padding: 0.7rem 1.3rem;
+    font-size: 0.95rem;
+    min-width: 140px;
+  }
+  
+  .start-btn {
+    font-size: 1.1rem;
+    padding: 0.9rem 1.8rem;
+  }
+  
+  .clef-btn {
+    padding: 0.7rem;
+    font-size: 0.85rem;
+  }
+  
+  .clef-symbol {
+    font-size: 1.6rem;
+  }
+  
+  .tutorial-content {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .tutorial-image {
+    width: 140px;
+    align-self: center;
+  }
+  
+  .modal-content {
+    margin: 5% auto;
+    padding: 1.3rem;
+    width: 95%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .menu-container h1 {
+    font-size: 2rem;
+  }
+  
+  .menu-btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+    min-width: 130px;
+  }
+  
+  .start-btn {
+    font-size: 1rem;
+    padding: 0.8rem 1.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .menu-container h1 {
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+  }
+  
+  .clef-selection, .ledger-line-selection, .high-scores-display {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .clef-options {
+    gap: 0.6rem;
+  }
+  
+  .scores-grid {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .score-item {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  
+  .score-number {
+    font-size: 1.3rem;
+  }
+  
+  .menu-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    min-width: 120px;
+  }
+  
+  .start-btn {
+    font-size: 0.95rem;
+    padding: 0.7rem 1.4rem;
+  }
+  
+  .clef-btn {
+    padding: 0.5rem;
+    font-size: 0.8rem;
+    min-width: 75px;
+  }
+  
+  .clef-symbol {
+    font-size: 1.4rem;
+  }
+  
+  .clef-name {
+    font-size: 0.75rem;
+  }
+  
+  .menu-buttons {
+    gap: 0.8rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .menu-container h1 {
+    font-size: 1.6rem;
+    margin-bottom: 0.8rem;
+  }
+  
+  .clef-selection, .ledger-line-selection, .high-scores-display {
+    padding: 0.8rem;
+    margin-bottom: 0.8rem;
+  }
+  
+  .clef-selection h2, .ledger-line-selection h2 {
+    font-size: 1.1rem;
+  }
+  
+  .high-scores-display h3 {
+    font-size: 1.1rem;
+  }
+  
+  .clef-options {
+    gap: 0.4rem;
+  }
+  
+  .clef-btn {
+    padding: 0.4rem;
+    min-width: 70px;
+  }
+  
+  .clef-symbol {
+    font-size: 1.2rem;
+  }
+  
+  .clef-name {
+    font-size: 0.7rem;
+  }
+  
+  .difficulty-btn {
+    padding: 0.8rem 1.5rem;
+    font-size: 0.85rem;
+    min-width: 200px;
+  }
+  
+  .menu-btn {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.8rem;
+    min-width: 110px;
+  }
+  
+  .start-btn {
+    font-size: 0.9rem;
+    padding: 0.6rem 1.3rem;
+  }
+  
+  .score-number {
+    font-size: 1.2rem;
+  }
+  
+  .score-label {
+    font-size: 0.8rem;
+  }
+}
+
+/* Pre-game modal styles */
+.pregame-content {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.pregame-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 1.5rem;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Note Helper modal styles */
+.note-helper-content {
+  max-width: 90vw;
+  max-height: 90vh;
+  text-align: center;
+}
+
+.note-helper-image {
+  overflow: auto;
+  max-height: 70vh;
+}
+
+.helper-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* MIDI Controls in Menu */
+.option-group select {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  min-width: 200px;
+  margin-top: 5px;
+  display: block;
+}
+
+.option-group select:disabled {
+  background: rgba(200, 200, 200, 0.6);
+  color: #666;
+}
+
+.midi-status-menu {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  margin-top: 5px;
+  text-align: center;
+}
+
+.midi-status-menu.success {
+  background: #4CAF50;
+  color: white;
+}
+
+.midi-status-menu.warning {
+  background: #FF9800;
+  color: white;
+}
+
+.midi-status-menu.error {
+  background: #f44336;
+  color: white;
+}
+
+.midi-status-menu.info {
+  background: #2196F3;
+  color: white;
+}
+
+/* Piano Mode Status in Menu */
+.piano-mode-status {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  border: 2px solid #2c5aa0;
+  border-radius: 10px;
+  text-align: center;
+  animation: pianoModeGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes pianoModeGlow {
+  from {
+    box-shadow: 0 0 10px rgba(74, 144, 226, 0.3);
+  }
+  to {
+    box-shadow: 0 0 20px rgba(74, 144, 226, 0.6);
+  }
+}
+
+.piano-mode-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.piano-icon {
+  font-size: 1.8rem;
+  animation: pianoKeyBounce 1s ease-in-out infinite alternate;
+}
+
+@keyframes pianoKeyBounce {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.1);
+  }
+}
+
+.piano-text {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.piano-mode-description {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+  line-height: 1.4;
+}
+
+/* Piano Mode Section Styles */
+.piano-mode-section {
+  margin-bottom: 2rem;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 1.5rem;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.piano-mode-section h2 {
+  color: #333;
+  font-size: 1.3rem;
+  margin: 0 0 1rem 0;
+  text-align: center;
+}
+
+.piano-mode-main-control {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.piano-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 2rem;
+  border: 2px solid #6c63ff;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+  min-width: 200px;
+  justify-content: center;
+}
+
+.piano-mode-btn:hover:not(:disabled) {
+  border-color: #5a52d5;
+  background: #f8f7ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
+}
+
+.piano-mode-btn.active {
+  border-color: #5a52d5;
+  background: linear-gradient(135deg, #6c63ff, #5a52d5);
+  color: white;
+  box-shadow: 0 4px 15px rgba(108, 99, 255, 0.4);
+}
+
+.piano-mode-btn.active .piano-status {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.piano-mode-btn:disabled {
+  border-color: #ccc;
+  background: #f5f5f5;
+  color: #999;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.piano-icon {
+  font-size: 1.5rem;
+}
+
+.piano-text {
+  font-weight: bold;
+  color: #333;
+}
+
+/* Piano Mode button text: black by default, green when enabled */
+.piano-mode-btn.active .piano-text {
+  color: #28a745; /* Green color when Piano Mode is active */
+}
+
+.piano-status {
+  font-size: 0.85rem;
+  color: #666;
+  font-style: italic;
+}
+
+.piano-mode-options {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(108, 99, 255, 0.2);
+  border-radius: 10px;
+  padding: 0;
+  margin-top: 1rem;
+  transition: all 0.3s ease;
+}
+
+.piano-options-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(108, 99, 255, 0.2);
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 10px 10px 0 0;
+}
+
+.piano-options-title {
+  font-weight: bold;
+  color: #333;
+  font-size: 1rem;
+}
+
+.piano-mode-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.piano-mode-close-btn:hover {
+  background: rgba(255, 0, 0, 0.1);
+  color: #d32f2f;
+}
+
+.piano-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+.piano-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.piano-option label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.piano-option input[type="checkbox"] {
+  margin-top: 0.1rem;
+  transform: scale(1.1);
+}
+
+.piano-option input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.option-label {
+  font-weight: bold;
+  color: #333; /* Default black color */
+  transition: color 0.3s ease;
+}
+
+/* Green color when checkbox is checked */
+.piano-option input[type="checkbox"]:checked + .option-label {
+  color: #28a745; /* Green color when selected */
+}
+
+/* For dropdown labels - green when non-default option is selected */
+.piano-option .hand-select:not([value="none"]) ~ label .option-label,
+.piano-option .hand-select option:checked:not([value="none"]) ~ label .option-label {
+  color: #28a745; /* Green color when selected */
+}
+
+/* Option descriptions: black text for better readability */
+.option-description {
+  font-size: 0.8rem;
+  color: #666; /* Changed from white to gray for better readability */
+  margin-top: 0.2rem;
+  line-height: 1.3;
+}
+
+.piano-option.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.dropdown-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.hand-select {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
+}
+
+.hand-select:hover {
+  border-color: #6c63ff;
+}
+
+.hand-select:disabled {
+  background: #f5f5f5;
+  color: #999;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Responsive adjustments for Piano Mode */
+@media (max-width: 768px) {
+  .piano-options-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .piano-mode-btn {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    min-width: auto;
+  }
+  
+  .piano-text {
+    font-size: 0.9rem;
+  }
+  
+  .piano-status {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .piano-mode-section {
+    padding: 1rem;
+  }
+  
+  .piano-mode-options {
+    padding: 1rem;
+  }
+  
+  .piano-option label {
+    font-size: 0.9rem;
+  }
+  
+  .option-description {
+    font-size: 0.75rem;
+  }
+}

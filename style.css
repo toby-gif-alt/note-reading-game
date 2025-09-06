@@ -1,0 +1,679 @@
+@font-face {
+  font-family: 'Bravura';
+  src: url('bravura/redist/woff/Bravura.woff2') format('woff2'),
+       url('bravura/redist/woff/Bravura.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f6f7fb;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+h1 {
+  margin: 10px 0;
+  color: #fff;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+  z-index: 10;
+  position: relative;
+}
+
+.controls {
+  margin: 20px 0;
+  position: fixed;
+  top: 10px;
+  left: 20px;
+  z-index: 10;
+  background: none;
+  padding: 10px;
+  border-radius: 5px;
+}
+
+.input-row {
+  margin: 20px 0;
+  position: fixed;
+  bottom: 60px;
+  right: 20px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 10px;
+  border-radius: 5px;
+}
+
+#staffCanvas {
+  background: transparent;
+  border: none;
+  flex: 1;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Bottom controls container */
+.bottom-controls {
+  position: fixed;
+  bottom: 20px; /* Moved closer to bottom */
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: linear-gradient(45deg, rgba(30, 30, 60, 0.95), rgba(50, 30, 80, 0.95));
+  backdrop-filter: blur(10px);
+  border-top: 2px solid rgba(255, 255, 255, 0.2);
+  padding: 15px;
+}
+
+/* Pitch buttons styling */
+.pitch-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.pitch-btn {
+  background: linear-gradient(45deg, #4a90e2, #357abd);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.pitch-btn:hover {
+  background: linear-gradient(45deg, #5ba0f2, #4580cd);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.pitch-btn:active {
+  transform: translateY(0);
+  background: linear-gradient(45deg, #357abd, #2a6ba3);
+}
+
+/* Game info section */
+.game-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.game-stats {
+  display: flex;
+  gap: 20px;
+  font-weight: bold;
+  align-items: center; /* Ensure all elements align properly */
+}
+
+.game-stats > div {
+  font-size: 18px; /* Consistent font size for all stats */
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+/* Life icons styling */
+#lives-container {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.life-icon {
+  width: 32px;
+  height: 32px;
+  background-image: url('images/life.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  position: relative;
+}
+
+.life-icon.lost {
+  filter: brightness(0.4) sepia(1) hue-rotate(-50deg) saturate(0.5);
+}
+
+.life-icon.lost::after {
+  content: '✕';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #ff0000;
+  font-size: 18px;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+.control-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.control-btn {
+  background: linear-gradient(45deg, #6c757d, #545b62);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.control-btn:hover {
+  background: linear-gradient(45deg, #7c858d, #646b72);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+}
+
+#noteInput {
+  font-size: 18px;
+  padding: 8px;
+  width: 180px;
+  border-radius: 4px;
+  border: 1px solid #bbb;
+}
+
+#submitBtn {
+  font-size: 18px;
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  background: #4378ff;
+  color: #fff;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+#submitBtn:hover {
+  background: #3059b7;
+}
+
+#restartBtn {
+  font-size: 18px;
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  background: #28a745;
+  color: #fff;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+#restartBtn:hover {
+  background: #218838;
+}
+
+#feedback {
+  font-size: 16px;
+  color: #d0021b;
+  margin-bottom: 10px;
+}
+
+#lives, #meteorsDestroyed {
+  color: white; /* Change to white to match theme */
+}
+
+.audio-controls {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: none;
+  padding: 10px;
+  border-radius: 5px;
+  display: flex;
+  gap: 20px;
+}
+
+.audio-control {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.audio-control label {
+  font-size: 14px;
+  color: white;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+.audio-control input[type="range"] {
+  width: 80px;
+}
+
+/* MIDI Controls */
+.midi-control {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.midi-control label {
+  font-size: 14px;
+  color: white;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+.midi-control select {
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  min-width: 120px;
+}
+
+.midi-control select:disabled {
+  background: rgba(200, 200, 200, 0.6);
+  color: #666;
+}
+
+.midi-status {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: bold;
+  text-shadow: none;
+}
+
+.midi-status.success {
+  background: #4CAF50;
+  color: white;
+}
+
+.midi-status.warning {
+  background: #FF9800;
+  color: white;
+}
+
+.midi-status.error {
+  background: #f44336;
+  color: white;
+}
+
+.midi-status.info {
+  background: #2196F3;
+  color: white;
+}
+
+/* MIDI Input Highlighting */
+.pitch-btn.midi-highlight {
+  background: linear-gradient(45deg, #4CAF50, #8BC34A) !important;
+  transform: scale(1.1);
+  box-shadow: 0 0 15px rgba(76, 175, 80, 0.6);
+}
+
+/* MIDI Notification */
+.midi-notification {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.midi-notification.show {
+  opacity: 1;
+}
+
+.midi-notification.success {
+  background: rgba(76, 175, 80, 0.9);
+}
+
+.midi-notification.warning {
+  background: rgba(255, 152, 0, 0.9);
+}
+
+.midi-notification.error {
+  background: rgba(244, 67, 54, 0.9);
+}
+
+.audio-control button {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px;
+}
+
+/* Old pitch buttons styling - remove this section */
+.pitch-buttons {
+  position: fixed;
+  bottom: 140px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: none;
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.pitch-btn {
+  margin: 3px;
+  padding: 10px 15px;
+  font-size: 18px;
+  font-weight: bold;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: linear-gradient(45deg, #4a90e2, #357abd);
+  color: white;
+  cursor: pointer;
+  border-radius: 50%; /* Keep circular for space theme consistency */
+  transition: all 0.2s ease;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+  width: 45px;
+  height: 45px;
+}
+
+.pitch-btn:hover {
+  background: linear-gradient(45deg, #5ba0f2, #4580cd);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.pitch-btn:active {
+  transform: translateY(0);
+  background: linear-gradient(45deg, #357abd, #2a6ba3);
+}
+/* Mobile responsive styles - make mobile look like desktop but scaled */
+@media (max-width: 768px) {
+  /* Scale down bottom controls to fit mobile */
+  .bottom-controls {
+    padding: 8px;
+    bottom: 10px;
+  }
+  
+  .pitch-buttons {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  
+  .pitch-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+    margin: 2px;
+  }
+  
+  .game-info {
+    gap: 10px;
+  }
+  
+  .game-stats {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  
+  .game-stats > div {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  
+  .control-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  
+  /* Scale down audio controls */
+  .audio-controls {
+    right: 8px;
+    top: 8px;
+    gap: 8px;
+  }
+  
+  .audio-control {
+    gap: 4px;
+  }
+  
+  .audio-control label {
+    font-size: 11px;
+  }
+  
+  .audio-control input[type="range"] {
+    width: 60px;
+  }
+  
+  .audio-control button {
+    font-size: 14px;
+  }
+}
+
+/* Compact mobile portrait mode - same layout as desktop but smaller */
+@media (max-width: 480px) {
+  .bottom-controls {
+    padding: 6px;
+    bottom: 5px;
+  }
+  
+  .pitch-buttons {
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  
+  .pitch-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+    margin: 1px;
+  }
+  
+  .game-stats {
+    gap: 8px;
+  }
+  
+  .game-stats > div {
+    font-size: 11px;
+  }
+  
+  .control-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  
+  /* Compact audio controls */
+  .audio-controls {
+    right: 5px;
+    top: 5px;
+    gap: 6px;
+  }
+  
+  .audio-control label {
+    font-size: 10px;
+  }
+  
+  .audio-control input[type="range"] {
+    width: 50px;
+  }
+  
+  .audio-control button {
+    font-size: 12px;
+  }
+}
+
+/* Ultra-compact for very small screens */
+@media (max-width: 320px) {
+  .pitch-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
+  
+  .game-stats > div {
+    font-size: 10px;
+  }
+}
+
+/* Landscape optimizations - still keeping desktop layout */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+  .bottom-controls {
+    bottom: 5px;
+    padding: 6px;
+  }
+  
+  .pitch-buttons {
+    margin-bottom: 6px;
+    gap: 6px;
+  }
+  
+  .pitch-btn {
+    width: 35px;
+    height: 35px;
+    font-size: 15px;
+  }
+  
+  .game-stats {
+    gap: 10px;
+  }
+  
+  .game-stats > div {
+    font-size: 12px;
+  }
+  
+  .control-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+
+
+/* Level progression popup */
+.level-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 30px 50px;
+  border-radius: 20px;
+  font-size: 48px;
+  font-weight: bold;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+  z-index: 1000;
+  animation: levelPopupAnimation 3s ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes levelPopupAnimation {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+}
+
+/* Piano Mode Controls */
+.piano-mode-controls {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid #4a90e2;
+  border-radius: 10px;
+  padding: 15px;
+  color: white;
+  font-family: 'Arial', sans-serif;
+  min-width: 250px;
+  z-index: 100;
+  animation: pianoModeSlideIn 0.3s ease-out;
+}
+
+@keyframes pianoModeSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.piano-mode-header {
+  text-align: center;
+  margin-bottom: 15px;
+  border-bottom: 1px solid rgba(74, 144, 226, 0.5);
+  padding-bottom: 8px;
+}
+
+.piano-mode-header h3 {
+  margin: 0;
+  color: #4a90e2;
+  font-size: 16px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+.piano-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.piano-option {
+  display: flex;
+  align-items: center;
+}
+
+.piano-option label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.piano-option input[type="checkbox"] {
+  margin-right: 8px;
+  transform: scale(1.1);
+  cursor: pointer;
+}
+
+.piano-option input[type="checkbox"]:checked + span,
+.piano-option label:has(input:checked) {
+  color: #4CAF50;
+  font-weight: bold;
+}
