@@ -1988,37 +1988,96 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
   // This ensures responsive chord input by removing the 5-second throttling that was blocking new input
   cleanupStaleChordProgress();
   
-  // Find the leftmost note (closest to clef) - with special handling for piano mode hand independence
-  let leftmostNote = null;
-  let leftmostIndex = -1;
-  let minDistance = Infinity;
+  // FIXED: Enforce left-to-right destruction order
+  // Find the absolute leftmost note on screen (regardless of note letter)
+  let absoluteLeftmostNote = null;
+  let absoluteLeftmostIndex = -1;
+  let minAbsoluteDistance = Infinity;
   
-  // For piano mode with hand independence, only consider notes from active hands' clefs
+  // First pass: find the leftmost note on screen regardless of letter
   movingNotes.forEach((note, index) => {
-    if (note.note.toUpperCase() === userNote) {
-      // In piano mode, check if this note belongs to an active hand
-      if (pianoModeActive && currentClef === 'grand') {
-        const leftHandActive = pianoModeSettings.leftHand !== 'none';
-        const rightHandActive = pianoModeSettings.rightHand !== 'none';
-        
-        // Only consider notes from clefs that have active hands
-        const noteIsFromActiveHand = 
-          (note.clef === 'bass' && leftHandActive) || 
-          (note.clef === 'treble' && rightHandActive);
-        
-        if (!noteIsFromActiveHand) {
-          return; // Skip notes from inactive hands
-        }
-      }
+    // In piano mode, check if this note belongs to an active hand
+    if (pianoModeActive && currentClef === 'grand') {
+      const leftHandActive = pianoModeSettings.leftHand !== 'none';
+      const rightHandActive = pianoModeSettings.rightHand !== 'none';
       
-      const distance = note.x;
-      if (distance < minDistance) {
-        minDistance = distance;
-        leftmostNote = note;
-        leftmostIndex = index;
+      // Only consider notes from clefs that have active hands
+      const noteIsFromActiveHand = 
+        (note.clef === 'bass' && leftHandActive) || 
+        (note.clef === 'treble' && rightHandActive);
+      
+      if (!noteIsFromActiveHand) {
+        return; // Skip notes from inactive hands
       }
     }
+    
+    const distance = note.x;
+    if (distance < minAbsoluteDistance) {
+      minAbsoluteDistance = distance;
+      absoluteLeftmostNote = note;
+      absoluteLeftmostIndex = index;
+    }
   });
+  
+  // Only allow input for the leftmost note - enforce left-to-right destruction
+  if (!absoluteLeftmostNote) {
+    return; // No notes on screen
+  }
+  
+  // Check if user input matches the leftmost note
+  if (absoluteLeftmostNote.note.toUpperCase() !== userNote) {
+    // User tried to destroy a note that isn't the leftmost one
+    // This is considered a wrong answer - provide feedback about the correct note
+    feedback.textContent = `Wrong! You must destroy notes from left to right. The leftmost note is ${absoluteLeftmostNote.note.toUpperCase()}`;
+    feedback.style.color = '#d0021b';
+    feedback.style.fontSize = '16px';
+    
+    lives--;
+    
+    // Add light shake effect for wrong input order
+    triggerShake(3, 200);
+    
+    // Add explosion at clef position
+    let clefX = 35;
+    let clefY = canvas.height * 0.2 + 60;
+    
+    if (currentClef === 'grand' && absoluteLeftmostNote) {
+      if (absoluteLeftmostNote.clef === 'treble' && currentTrebleStave) {
+        clefX = currentTrebleStave.clefX;
+        clefY = currentTrebleStave.clefY;
+      } else if (absoluteLeftmostNote.clef === 'bass' && currentBassStave) {
+        clefX = currentBassStave.clefX;
+        clefY = currentBassStave.clefY;
+      }
+    } else {
+      if (currentClef === 'treble' && currentTrebleStave) {
+        clefX = currentTrebleStave.clefX;
+        clefY = currentTrebleStave.clefY;
+      } else if (currentClef === 'bass' && currentBassStave) {
+        clefX = currentBassStave.clefX;
+        clefY = currentBassStave.clefY;
+      }
+    }
+    
+    createClefExplosion(clefX, clefY, 65, 500);
+    
+    // Flash screen red
+    flashEffect.active = true;
+    flashEffect.startTime = Date.now();
+    
+    playSound('explosionLoseLive');
+    updateLifeDisplay();
+    
+    if (lives <= 0) {
+      gameOver();
+    }
+    
+    return; // Exit early for wrong input order
+  }
+  
+  // At this point, user input matches the leftmost note
+  let leftmostNote = absoluteLeftmostNote;
+  let leftmostIndex = absoluteLeftmostIndex;
   
   // For chord mode, find all notes with the same chord ID
   let chordNotes = [];
