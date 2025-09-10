@@ -316,6 +316,7 @@ function updatePianoModeControls() {
   
   // Check if MIDI device is available
   let hasMidiDevice = false;
+  
   if (typeof window.getMenuMidiStatus === 'function') {
     const midiStatus = window.getMenuMidiStatus();
     hasMidiDevice = midiStatus.connectedDevices && midiStatus.connectedDevices.length > 0;
@@ -449,6 +450,20 @@ document.addEventListener('DOMContentLoaded', function() {
   // Piano Mode activation toggle
   document.getElementById('pianoModeActiveToggle').addEventListener('change', function() {
     gameSettings.pianoMode.active = this.checked;
+    
+    // Auto-activate both hands when Piano Mode is enabled
+    if (this.checked) {
+      gameSettings.pianoMode.leftHand = 'melody';  // Bass clef (left hand)
+      gameSettings.pianoMode.rightHand = 'melody'; // Treble clef (right hand)
+      
+      // Force Grand Staff when Piano Mode is active
+      gameSettings.clef = 'grand';
+      updateClefButtons();
+    } else {
+      // Reset hands to none when Piano Mode is disabled
+      gameSettings.pianoMode.leftHand = 'none';
+      gameSettings.pianoMode.rightHand = 'none';
+    }
     
     updatePianoModeUI();
     saveSettings();
