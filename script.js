@@ -2579,6 +2579,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
       
       // Clear all notes on screen when advancing to new level
       movingNotes = [];
+      window.movingNotes = movingNotes;
       
       // Show level popup
       showLevelPopup(level);
@@ -2831,6 +2832,7 @@ if (clefSelect) {
       currentClef = clefSelect.value;
       // Clear existing notes and meteors when changing clef
       movingNotes = [];
+      window.movingNotes = movingNotes;
       meteors = [];
       
       // Update clef display
