@@ -258,6 +258,10 @@ export function reinitializeMidiAfterRestart() {
         // Visual feedback for MIDI input (FIRST)
         const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
         highlightMidiInput(noteForGame);
+        // IMPORTANT: Call the one-at-a-time handler right after key highlighting
+        if (typeof globalThis.handleNoteOnOneAtATime === 'function') {
+            globalThis.handleNoteOnOneAtATime(noteMapping.midiNote, 64);
+        }
         // IMPORTANT: CALL THE DISPATCHER right after UI highlight
         dispatchNoteOn(noteMapping.midiNote, 64);
         // Legacy support: also call the existing game handlers for compatibility
@@ -287,6 +291,10 @@ export function initializeMidiIntegration() {
         // Visual feedback for MIDI input (FIRST)
         const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
         highlightMidiInput(noteForGame);
+        // IMPORTANT: Call the one-at-a-time handler right after key highlighting
+        if (typeof globalThis.handleNoteOnOneAtATime === 'function') {
+            globalThis.handleNoteOnOneAtATime(noteMapping.midiNote, 64);
+        }
         // IMPORTANT: CALL THE DISPATCHER right after UI highlight
         dispatchNoteOn(noteMapping.midiNote, 64);
         // Legacy support: only call legacy handlers in Normal Mode to avoid conflicts

@@ -298,6 +298,11 @@ export function reinitializeMidiAfterRestart(): void {
     const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
     highlightMidiInput(noteForGame);
     
+    // IMPORTANT: Call the one-at-a-time handler right after key highlighting
+    if (typeof (globalThis as any).handleNoteOnOneAtATime === 'function') {
+      (globalThis as any).handleNoteOnOneAtATime(noteMapping.midiNote, 64);
+    }
+    
     // IMPORTANT: CALL THE DISPATCHER right after UI highlight
     dispatchNoteOn(noteMapping.midiNote, 64);
     
@@ -331,6 +336,11 @@ export function initializeMidiIntegration(): void {
     // Visual feedback for MIDI input (FIRST)
     const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
     highlightMidiInput(noteForGame);
+    
+    // IMPORTANT: Call the one-at-a-time handler right after key highlighting
+    if (typeof (globalThis as any).handleNoteOnOneAtATime === 'function') {
+      (globalThis as any).handleNoteOnOneAtATime(noteMapping.midiNote, 64);
+    }
     
     // IMPORTANT: CALL THE DISPATCHER right after UI highlight
     dispatchNoteOn(noteMapping.midiNote, 64);
