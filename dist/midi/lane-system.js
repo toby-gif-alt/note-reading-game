@@ -7,14 +7,6 @@ const BASS_MAX_MIDI = 59; // B3
 const TREBLE_MIN_MIDI = 60; // C4
 const CHORD_WINDOW_MS = 100; // milliseconds
 const CHORD_SPAWN_MULTIPLIER = 1.25; // chords spawn 25% slower than normal at same level
-// === Piano Mode split (B3/C4) ===
-function _routeClefByMidi(midi) {
-    return midi <= BASS_MAX_MIDI ? 'bass' : 'treble';
-}
-function _isPianoOn() {
-    // Prefer existing flag; fall back to settings if present
-    return !!(typeof globalThis.pianoModeActive !== 'undefined' ? globalThis.pianoModeActive : (globalThis.gameSettings && globalThis.gameSettings.pianoMode));
-}
 // --------------------------- GLOBAL STATE ---------------------------
 const laneStates = new Map();
 // --------------------------- GAME-WIDE ACCESSORS ---------------------------
@@ -58,59 +50,6 @@ function decrementLives(lane, amount = 1) {
     // Update the UI display
     if (typeof globalThis.updateLifeDisplay === 'function') {
         globalThis.updateLifeDisplay();
-    }
-}
-function _decLife(clef) {
-    if (!_isPianoOn()) {
-        globalThis.lives--;
-        if (typeof globalThis.updateLifeDisplay === 'function') {
-            globalThis.updateLifeDisplay();
-        }
-        return;
-    }
-    if (clef === 'bass') {
-        globalThis.bassLives = Math.max(0, (globalThis.bassLives || 0) - 1);
-        if (typeof globalThis.updateLifeDisplay === 'function') {
-            globalThis.updateLifeDisplay();
-        }
-    }
-    if (clef === 'treble') {
-        globalThis.trebleLives = Math.max(0, (globalThis.trebleLives || 0) - 1);
-        if (typeof globalThis.updateLifeDisplay === 'function') {
-            globalThis.updateLifeDisplay();
-        }
-    }
-}
-function _laneEnabled(clef) {
-    if (!_isPianoOn())
-        return (globalThis.lives > 0);
-    return clef === 'bass' ? globalThis.bassLives > 0 : globalThis.trebleLives > 0;
-}
-function _stopAtZeroGuards(clef) {
-    if (_isPianoOn()) {
-        if (globalThis.bassLives <= 0) {
-            // Disable bass lane
-            const bassLs = getLaneState('bass');
-            if (bassLs)
-                bassLs.enabled = false;
-            if (typeof globalThis.disableBassLane === 'function') {
-                globalThis.disableBassLane();
-            }
-        }
-        if (globalThis.trebleLives <= 0) {
-            // Disable treble lane  
-            const trebleLs = getLaneState('treble');
-            if (trebleLs)
-                trebleLs.enabled = false;
-            if (typeof globalThis.disableTrebleLane === 'function') {
-                globalThis.disableTrebleLane();
-            }
-        }
-        if (globalThis.bassLives <= 0 && globalThis.trebleLives <= 0) {
-            if (typeof globalThis.stopGame === 'function') {
-                globalThis.stopGame('piano-both-dead');
-            }
-        }
     }
 }
 function popSuccess(lane, t) {
@@ -169,19 +108,13 @@ function routeLane(midi, pianoModeActive) {
  * onMidiNoteOn(midi, velocity) { handleMidiNoteOn(midi, velocity); }
  */
 export function handleMidiNoteOn(midi, velocity) {
-    // Determine routed clef in Piano Mode; otherwise keep Normal Mode
-    let routedClef = null;
-    if (_isPianoOn()) {
-        routedClef = _routeClefByMidi(midi); // 'bass' or 'treble'
-    }
-    else {
-        routedClef = 'mono';
-    }
-    const ls = getLaneState(routedClef);
+    const { pianoModeActive } = getGameMode();
+    const lane = routeLane(midi, pianoModeActive);
+    const ls = getLaneState(lane);
     if (!ls || !ls.enabled)
         return;
     ls.held.add(midi);
-    const tgt = activeTarget(routedClef);
+    const tgt = activeTarget(lane);
     if (!tgt)
         return;
     if (tgt.kind === 'melody') {
@@ -204,7 +137,6 @@ function handleMelody_Strict(ls, midi, tgt) {
     }
     else {
         decrementLives(ls.id, 1);
-        _stopAtZeroGuards(ls.id);
         removeActiveTargetFromQueue(ls.id);
         popFail(ls.id, tgt);
     }
@@ -224,7 +156,6 @@ function handleChord_Strict(ls, midi, tgt) {
     // Stray check first: any non-chord note blows up immediately while chord is active.
     if (!tones.has(midi)) {
         decrementLives(ls.id, 1);
-        _stopAtZeroGuards(ls.id);
         removeActiveTargetFromQueue(ls.id);
         popFail(ls.id, tgt);
         ls.chordRuntime = undefined;
@@ -260,7 +191,6 @@ function chordTimeoutCheck(lane, targetId, startedAt) {
         return;
     if ((nowMs() - startedAt) >= CHORD_WINDOW_MS) {
         decrementLives(lane, 1);
-        _stopAtZeroGuards(lane);
         removeActiveTargetFromQueue(lane);
         popFail(lane, tgt);
         ls.chordRuntime = undefined;
@@ -273,8 +203,8 @@ function chordTimeoutCheck(lane, targetId, startedAt) {
  * In chord mode, the cadence is slower by CHORD_SPAWN_MULTIPLIER.
  */
 export function gameTickLoop(currentMs) {
-    const { level } = getGameMode();
-    const lanes = _isPianoOn() ? ['bass', 'treble'] : ['mono'];
+    const { pianoModeActive, level } = getGameMode();
+    const lanes = pianoModeActive ? ['bass', 'treble'] : ['mono'];
     for (const lane of lanes) {
         const ls = getLaneState(lane);
         if (!ls || !ls.enabled)
@@ -326,21 +256,14 @@ function nextChordTargetInRange(range) {
  * Initialize lane states based on game mode
  */
 function initializeLanes() {
-    const { level } = getGameMode();
+    const { pianoModeActive, level } = getGameMode();
     // Clear existing lanes
     laneStates.clear();
-    // At level/start when Piano Mode turns ON, ensure per-clef counters exist
-    if (_isPianoOn()) {
-        if (typeof globalThis.bassLives === 'undefined')
-            globalThis.bassLives = typeof globalThis.lives === 'number' ? globalThis.lives : 3;
-        if (typeof globalThis.trebleLives === 'undefined')
-            globalThis.trebleLives = typeof globalThis.lives === 'number' ? globalThis.lives : 3;
-    }
     // Base spawn interval function - gets faster with level
     const baseSpawnInterval = (level) => {
         return Math.max(800, 2200 - (level - 1) * 200);
     };
-    if (_isPianoOn()) {
+    if (pianoModeActive) {
         // Piano Mode: create bass and treble lanes
         laneStates.set('bass', {
             id: 'bass',

@@ -9,15 +9,6 @@ const TREBLE_MIN_MIDI = 60; // C4
 const CHORD_WINDOW_MS = 100; // milliseconds
 const CHORD_SPAWN_MULTIPLIER = 1.25; // chords spawn 25% slower than normal at same level
 
-// === Piano Mode split (B3/C4) ===
-function _routeClefByMidi(midi: number): 'bass' | 'treble' { 
-  return midi <= BASS_MAX_MIDI ? 'bass' : 'treble'; 
-}
-function _isPianoOn(): boolean {
-  // Prefer existing flag; fall back to settings if present
-  return !!(typeof (globalThis as any).pianoModeActive !== 'undefined' ? (globalThis as any).pianoModeActive : ((globalThis as any).gameSettings && (globalThis as any).gameSettings.pianoMode));
-}
-
 // --------------------------- TYPES ---------------------------
 type LaneId = 'bass' | 'treble' | 'mono';
 type Mode = 'melody' | 'chord';
@@ -95,59 +86,6 @@ function decrementLives(lane: LaneId, amount = 1): void {
   }
 }
 
-function _decLife(clef: LaneId): void {
-  if (!_isPianoOn()) { 
-    (globalThis as any).lives--; 
-    if (typeof (globalThis as any).updateLifeDisplay === 'function') {
-      (globalThis as any).updateLifeDisplay();
-    }
-    return; 
-  }
-  if (clef === 'bass')  { 
-    (globalThis as any).bassLives  = Math.max(0, ((globalThis as any).bassLives  || 0) - 1); 
-    if (typeof (globalThis as any).updateLifeDisplay === 'function') {
-      (globalThis as any).updateLifeDisplay();
-    }
-  }
-  if (clef === 'treble'){ 
-    (globalThis as any).trebleLives = Math.max(0, ((globalThis as any).trebleLives || 0) - 1); 
-    if (typeof (globalThis as any).updateLifeDisplay === 'function') {
-      (globalThis as any).updateLifeDisplay();
-    }
-  }
-}
-
-function _laneEnabled(clef: LaneId): boolean {
-  if (!_isPianoOn()) return ((globalThis as any).lives > 0);
-  return clef === 'bass' ? (globalThis as any).bassLives > 0 : (globalThis as any).trebleLives > 0;
-}
-
-function _stopAtZeroGuards(clef: LaneId): void {
-  if (_isPianoOn()) {
-    if ((globalThis as any).bassLives <= 0) { 
-      // Disable bass lane
-      const bassLs = getLaneState('bass');
-      if (bassLs) bassLs.enabled = false;
-      if (typeof (globalThis as any).disableBassLane === 'function') {
-        (globalThis as any).disableBassLane();
-      }
-    }
-    if ((globalThis as any).trebleLives <= 0) { 
-      // Disable treble lane  
-      const trebleLs = getLaneState('treble');
-      if (trebleLs) trebleLs.enabled = false;
-      if (typeof (globalThis as any).disableTrebleLane === 'function') {
-        (globalThis as any).disableTrebleLane();
-      }
-    }
-    if ((globalThis as any).bassLives <= 0 && (globalThis as any).trebleLives <= 0) {
-      if (typeof (globalThis as any).stopGame === 'function') {
-        (globalThis as any).stopGame('piano-both-dead');
-      }
-    }
-  }
-}
-
 function popSuccess(lane: LaneId, t: Target): void { 
   // Hook to existing success effects in the game
   if (typeof (globalThis as any).playSuccessSound === 'function') {
@@ -211,20 +149,14 @@ function routeLane(midi: number, pianoModeActive: boolean): LaneId {
  * onMidiNoteOn(midi, velocity) { handleMidiNoteOn(midi, velocity); }
  */
 export function handleMidiNoteOn(midi: number, velocity: number): void {
-  // Determine routed clef in Piano Mode; otherwise keep Normal Mode
-  let routedClef: LaneId | null = null;
-  if (_isPianoOn()) {
-    routedClef = _routeClefByMidi(midi); // 'bass' or 'treble'
-  } else {
-    routedClef = 'mono';
-  }
-  
-  const ls = getLaneState(routedClef);
+  const { pianoModeActive } = getGameMode();
+  const lane = routeLane(midi, pianoModeActive);
+  const ls = getLaneState(lane);
   if (!ls || !ls.enabled) return;
 
   ls.held.add(midi);
 
-  const tgt = activeTarget(routedClef);
+  const tgt = activeTarget(lane);
   if (!tgt) return;
 
   if (tgt.kind === 'melody') {
@@ -246,7 +178,6 @@ function handleMelody_Strict(ls: LaneState, midi: number, tgt: MelodyTarget): vo
     popSuccess(ls.id, tgt);
   } else {
     decrementLives(ls.id, 1);
-    _stopAtZeroGuards(ls.id);
     removeActiveTargetFromQueue(ls.id);
     popFail(ls.id, tgt);
   }
@@ -268,7 +199,6 @@ function handleChord_Strict(ls: LaneState, midi: number, tgt: ChordTarget): void
   // Stray check first: any non-chord note blows up immediately while chord is active.
   if (!tones.has(midi)) {
     decrementLives(ls.id, 1);
-    _stopAtZeroGuards(ls.id);
     removeActiveTargetFromQueue(ls.id);
     popFail(ls.id, tgt);
     ls.chordRuntime = undefined;
@@ -308,7 +238,6 @@ function chordTimeoutCheck(lane: LaneId, targetId: string, startedAt: number): v
   if (!rt || rt.activeId !== targetId) return;
   if ((nowMs() - startedAt) >= CHORD_WINDOW_MS) {
     decrementLives(lane, 1);
-    _stopAtZeroGuards(lane);
     removeActiveTargetFromQueue(lane);
     popFail(lane, tgt);
     ls.chordRuntime = undefined;
@@ -322,9 +251,9 @@ function chordTimeoutCheck(lane: LaneId, targetId: string, startedAt: number): v
  * In chord mode, the cadence is slower by CHORD_SPAWN_MULTIPLIER.
  */
 export function gameTickLoop(currentMs: number): void {
-  const { level } = getGameMode();
+  const { pianoModeActive, level } = getGameMode();
 
-  const lanes: LaneId[] = _isPianoOn() ? ['bass', 'treble'] : ['mono'];
+  const lanes: LaneId[] = pianoModeActive ? ['bass', 'treble'] : ['mono'];
   for (const lane of lanes) {
     const ls = getLaneState(lane);
     if (!ls || !ls.enabled) continue;
@@ -383,25 +312,17 @@ function nextChordTargetInRange(range: { min: number; max: number }): ChordTarge
  * Initialize lane states based on game mode
  */
 function initializeLanes(): void {
-  const { level } = getGameMode();
+  const { pianoModeActive, level } = getGameMode();
   
   // Clear existing lanes
   laneStates.clear();
-  
-  // At level/start when Piano Mode turns ON, ensure per-clef counters exist
-  if (_isPianoOn()) {
-    if (typeof (globalThis as any).bassLives === 'undefined')  
-      (globalThis as any).bassLives  = typeof (globalThis as any).lives === 'number' ? (globalThis as any).lives : 3;
-    if (typeof (globalThis as any).trebleLives === 'undefined') 
-      (globalThis as any).trebleLives = typeof (globalThis as any).lives === 'number' ? (globalThis as any).lives : 3;
-  }
   
   // Base spawn interval function - gets faster with level
   const baseSpawnInterval = (level: number) => {
     return Math.max(800, 2200 - (level - 1) * 200);
   };
   
-  if (_isPianoOn()) {
+  if (pianoModeActive) {
     // Piano Mode: create bass and treble lanes
     laneStates.set('bass', {
       id: 'bass',
