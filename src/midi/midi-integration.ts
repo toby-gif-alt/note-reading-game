@@ -166,8 +166,18 @@ function _fail(clef: 'bass' | 'treble', target: any, why: string): void {
 
 function _modeOf(clef: 'bass' | 'treble'): 'melody' | 'chord' {
   // Read existing piano mode settings for this lane
-  if (clef === 'bass' && pianoModeSettings.leftHand === 'chords') return 'chord';
-  if (clef === 'treble' && pianoModeSettings.rightHand === 'chords') return 'chord';
+  // Access global pianoModeSettings if available, otherwise check window properties
+  const globalSettings = (globalThis as any).pianoModeSettings || pianoModeSettings;
+  
+  if (clef === 'bass') {
+    const leftHandMode = globalSettings?.leftHand || (globalThis as any).leftHandMode;
+    if (leftHandMode === 'chords') return 'chord';
+  }
+  if (clef === 'treble') {
+    const rightHandMode = globalSettings?.rightHand || (globalThis as any).rightHandMode; 
+    if (rightHandMode === 'chords') return 'chord';
+  }
+  
   return 'melody'; // Default to melody so we never no-op
 }
 
@@ -595,6 +605,9 @@ export function updatePianoModeSettings(settings: Partial<PianoModeSettings>): v
   
   // Save to localStorage
   localStorage.setItem('pianoModeSettings', JSON.stringify(pianoModeSettings));
+  
+  // Also update global reference
+  (globalThis as any).pianoModeSettings = pianoModeSettings;
 }
 
 // Export test function for debugging
@@ -649,6 +662,12 @@ if (document.readyState === 'loading') {
     
     // Make test function globally accessible for testing
     (globalThis as any).testMidiDispatcher = testMidiDispatch;
+    // Make piano mode settings globally accessible
+    (globalThis as any).pianoModeSettings = pianoModeSettings;
+    // Make noteOn function available for self-test
+    (globalThis as any).noteOn = (midi: number, velocity: number = 100) => {
+      dispatchNoteOn(midi, velocity);
+    };
   });
 } else {
   // If document is already loaded, initialize immediately
@@ -657,7 +676,59 @@ if (document.readyState === 'loading') {
   
   // Make test function globally accessible for testing
   (globalThis as any).testMidiDispatcher = testMidiDispatch;
+  // Make piano mode settings globally accessible
+  (globalThis as any).pianoModeSettings = pianoModeSettings;
+  // Make noteOn function available for self-test
+  (globalThis as any).noteOn = (midi: number, velocity: number = 100) => {
+    dispatchNoteOn(midi, velocity);
+  };
 }
+
+// QUICK SELF-TEST (paste in DevTools Console after rebuild)
+// Copy this to DevTools console to test:
+/*
+// Treble melody strictness test
+window.pianoModeActive = true;
+window.bassLives = 2; window.trebleLives = 2;
+window.gameRunning = true;
+if (!window.movingNotes) window.movingNotes = [];
+window.movingNotes.length = 0;
+
+// Add test targets  
+window.movingNotes.push({
+  clef: 'treble', note: 'E', octave: 5, midiNote: 76, id: 'test-e5', x: 100, kind: 'melody'
+});
+window.movingNotes.push({
+  clef: 'bass', kind: 'chord', mids: [36, 40, 43], id: 'test-c2-chord', x: 100
+});
+
+// Test cases:
+console.log('=== MIDI Piano Mode Self-Test ===');
+console.log('1. Wrong treble first');
+noteOn(77, 100);   // F5 -> treble fail expected
+console.log('Bass lives:', window.bassLives, 'Treble lives:', window.trebleLives);
+
+// Re-add treble target for next test
+window.movingNotes.unshift({
+  clef: 'treble', note: 'E', octave: 5, midiNote: 76, id: 'test-e5-2', x: 100, kind: 'melody'
+});
+
+console.log('2. Correct treble');
+noteOn(76, 100);   // E5 -> treble success
+console.log('Score:', window.score, 'Bass lives:', window.bassLives, 'Treble lives:', window.trebleLives);
+
+console.log('3. Bass chord success within 100ms');
+// Set bass to chord mode for this test
+window.pianoModeSettings.leftHand = 'chords';
+noteOn(36,100); setTimeout(()=>noteOn(40,100),30); setTimeout(()=>noteOn(43,100),60);
+
+console.log('4. New bass chord stray -> immediate fail');  
+window.movingNotes.push({
+  clef: 'bass', kind: 'chord', mids: [36, 40, 43], id: 'test-c2-chord-2', x: 100
+});
+noteOn(41,100);    // F2 -> bass fail expected
+console.log('Final - Bass lives:', window.bassLives, 'Treble lives:', window.trebleLives);
+*/
 
 // Expose functions globally for integration with existing game code
 window.handleDeviceSelection = handleDeviceSelection;
