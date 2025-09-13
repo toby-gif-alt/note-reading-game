@@ -278,6 +278,15 @@ let gameSettings = {
 let pianoModeActive = false;
 let pianoModeSettings = {};
 
+// === Piano Mode split (B3/C4) ===
+const BASS_MAX_MIDI = 59;   // B3
+const TREBLE_MIN_MIDI = 60; // C4
+function _routeClefByMidi(midi) { return midi <= BASS_MAX_MIDI ? 'bass' : 'treble'; }
+function _isPianoOn() {
+  // Prefer existing flag; fall back to settings if present
+  return !!(typeof pianoModeActive !== 'undefined' ? pianoModeActive : (window.gameSettings && gameSettings.pianoMode));
+}
+
 // Chord completion tracking for Piano Mode with grace period
 let chordProgress = new Map(); // chordId -> { pressedNotes: Set, timestamps: Map, firstPressTime: number }
 
@@ -778,7 +787,7 @@ function drawStaffGreenLine(collisionX, staff, lengthFluctuation) {
 
 // Update life icons display based on current lives
 function updateLifeDisplay() {
-  if (pianoModeActive && currentClef === 'grand') {
+  if (_isPianoOn()) {
     // Piano Mode: show separate lives for bass and treble
     const regularLivesContainer = document.getElementById('lives-container');
     const pianoLivesContainer = document.getElementById('piano-lives-container');
@@ -1555,7 +1564,7 @@ function updateMovingNotes() {
       createClefExplosion(explosionX, explosionY, 60, 500);
       
       // Piano Mode: decrement lives based on clef
-      if (pianoModeActive && currentClef === 'grand') {
+      if (_isPianoOn()) {
         if (note.clef === 'bass' && bassClefActive) {
           bassLives--;
           if (bassLives <= 0) {
@@ -1586,7 +1595,7 @@ function updateMovingNotes() {
       respawnNote();
       
       // Check game over condition
-      if (pianoModeActive && currentClef === 'grand') {
+      if (_isPianoOn()) {
         // Piano Mode: game over only if both clefs are inactive
         if (!bassClefActive && !trebleClefActive) {
           gameOver();
@@ -2113,7 +2122,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
   // First pass: find the leftmost note on screen regardless of letter
   movingNotes.forEach((note, index) => {
     // In piano mode, check if this note belongs to an active hand
-    if (pianoModeActive && currentClef === 'grand') {
+    if (_isPianoOn()) {
       const leftHandActive = pianoModeSettings.leftHand !== 'none';
       const rightHandActive = pianoModeSettings.rightHand !== 'none';
       
@@ -2149,7 +2158,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
     feedback.style.fontSize = '16px';
     
     // Piano Mode: decrement lives based on clef
-    if (pianoModeActive && currentClef === 'grand') {
+    if (_isPianoOn()) {
       if (absoluteLeftmostNote.clef === 'bass' && bassClefActive) {
         bassLives--;
         if (bassLives <= 0) {
@@ -2312,7 +2321,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
         correctAnswers++;
         
         // Piano Mode: Track separate hand scores
-        if (pianoModeActive && currentClef === 'grand') {
+        if (_isPianoOn()) {
           if (matchedNote.clef === 'bass') {
             leftHandScore++;
           } else if (matchedNote.clef === 'treble') {
@@ -2408,7 +2417,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
       correctAnswers++;
       
       // Piano Mode: Track separate hand scores
-      if (pianoModeActive && currentClef === 'grand') {
+      if (_isPianoOn()) {
         if (matchedNote.clef === 'bass') {
           leftHandScore++;
         } else if (matchedNote.clef === 'treble') {
@@ -2476,7 +2485,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
     // Check for level progression
     let canAdvanceLevel = false;
     
-    if (pianoModeActive && currentClef === 'grand') {
+    if (_isPianoOn()) {
       // Piano Mode: level up when all active hands reach level 10
       const leftHandActive = pianoModeSettings.leftHand !== 'none';
       const rightHandActive = pianoModeSettings.rightHand !== 'none';
@@ -2568,7 +2577,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
     // Find the leftmost chord respecting hand boundaries in piano mode
     movingNotes.forEach((note, index) => {
       // In piano mode, check if this note belongs to an active hand
-      if (pianoModeActive && currentClef === 'grand') {
+      if (_isPianoOn()) {
         const leftHandActive = pianoModeSettings.leftHand !== 'none';
         const rightHandActive = pianoModeSettings.rightHand !== 'none';
         
@@ -2723,7 +2732,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
     // Don't immediately spawn a new note - let the current one finish flashing
     
     // Check game over condition
-    if (pianoModeActive && currentClef === 'grand') {
+    if (_isPianoOn()) {
       // Piano Mode: game over only if both clefs are inactive
       if (!bassClefActive && !trebleClefActive) {
         gameOver();
@@ -2748,7 +2757,7 @@ function updateDisplays() {
   notesDestroyedDisplay.textContent = `Notes Destroyed: ${notesDestroyed}`;
   
   // Update hand scores if Piano Mode is active
-  if (pianoModeActive && currentClef === 'grand') {
+  if (_isPianoOn()) {
     leftHandDisplay.textContent = `Left Hand: ${leftHandScore}`;
     rightHandDisplay.textContent = `Right Hand: ${rightHandScore}`;
   }
