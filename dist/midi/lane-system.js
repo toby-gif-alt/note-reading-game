@@ -316,28 +316,16 @@ function chordTimeoutCheck(lane, targetId, startedAt) {
  * In chord mode, the cadence is slower by CHORD_SPAWN_MULTIPLIER.
  */
 export function gameTickLoop(currentMs) {
-    const { level } = getGameMode();
-    const lanes = _isPianoOn() ? ['bass', 'treble'] : ['mono'];
-    for (const lane of lanes) {
-        const ls = getLaneState(lane);
-        if (!ls || !ls.enabled)
-            continue;
-        const due = currentMs >= ls.spawnNextAtMs;
-        if (due) {
-            const interval = (ls.mode === 'chord')
-                ? ls.spawnIntervalChordMs(level)
-                : ls.spawnIntervalMs(level);
-            const next = (ls.mode === 'chord')
-                ? nextChordTargetInRange(ls.range)
-                : nextMelodyTargetInRange(ls.range);
-            spawnTarget(lane, next);
-            updateLaneState(lane, { spawnNextAtMs: currentMs + interval });
+    // Use the new one-at-a-time spawning system instead of the old multi-spawn system
+    const activeLanes = laneForPlay();
+    for (const lane of activeLanes) {
+        // Check if this lane has no active target and spawn one
+        if (!lanes[lane].active) {
+            spawnNext(lane);
         }
-        // TODO: move visuals by ls.movementSpeedPxPerSec * dt, handle miss-at-hitline exactly once:
-        // If a target crosses the hit line without success, call:
-        //   decrementLives(lane, 1); removeActiveTargetFromQueue(lane); popFail(lane, target);
     }
-    // requestAnimationFrame/gameLoop re-schedule is handled elsewhere.
+    // The rest of the game loop (visual updates, collision detection) 
+    // is handled by the main game loop in script.js
 }
 // --------------------------- SPAWNING (single active target; auto after resolve) ---------------------------
 function spawnX() {
@@ -397,21 +385,20 @@ function spawnVisualTarget(lane, target, options) {
         const movingNotes = globalThis.movingNotes;
         if (movingNotes && Array.isArray(movingNotes)) {
             if (target.kind === 'melody') {
-                // Create a single note
-                const note = globalThis.midiToNote ? globalThis.midiToNote(target.midi) : { note: 'C', octave: 4 };
-                movingNotes.push({
-                    clef: lane === 'mono' ? (globalThis.currentClef || 'treble') : lane,
-                    note: note.note,
-                    octave: note.octave,
-                    midiNote: target.midi,
-                    id: target.id,
+                // Create a single note using the new helper
+                const noteData = midiToGameNote(target.midi, lane);
+                const movingNote = {
                     x: options.x,
                     speed: options.speedPxPerSec / 60, // convert to px per frame assuming 60fps
-                    kind: 'melody'
-                });
+                    id: target.id,
+                    kind: 'melody',
+                    ...noteData
+                };
+                movingNotes.push(movingNote);
             }
             else if (target.kind === 'chord') {
                 // Create a chord target
+                const baseNote = midiToGameNote(target.mids[0], lane);
                 movingNotes.push({
                     clef: lane === 'mono' ? (globalThis.currentClef || 'treble') : lane,
                     kind: 'chord',
@@ -419,25 +406,24 @@ function spawnVisualTarget(lane, target, options) {
                     id: target.id,
                     x: options.x,
                     speed: options.speedPxPerSec / 60,
-                    isChord: true
+                    isChord: true,
+                    ...baseNote
                 });
             }
             else if (target.kind === 'melodyPhrase') {
                 // Create a phrase target (for now, show first note)
                 const firstMidi = target.mids[0];
-                const note = globalThis.midiToNote ? globalThis.midiToNote(firstMidi) : { note: 'C', octave: 4 };
-                movingNotes.push({
-                    clef: lane === 'mono' ? (globalThis.currentClef || 'treble') : lane,
-                    note: note.note,
-                    octave: note.octave,
-                    midiNote: firstMidi,
-                    id: target.id,
+                const noteData = midiToGameNote(firstMidi, lane);
+                const movingNote = {
                     x: options.x,
                     speed: options.speedPxPerSec / 60,
+                    id: target.id,
                     kind: 'melodyPhrase',
                     mids: target.mids,
-                    phraseIndex: 0
-                });
+                    phraseIndex: 0,
+                    ...noteData
+                };
+                movingNotes.push(movingNote);
             }
         }
     }
@@ -476,6 +462,35 @@ function nextMelodyPhraseInRange(lane) {
         arr.push(cur);
     }
     return arr;
+}
+// Helper function to convert MIDI to game note format
+function midiToGameNote(midi, lane) {
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const octave = Math.floor(midi / 12) - 1;
+    const noteIndex = midi % 12;
+    const noteName = noteNames[noteIndex];
+    // For now, map sharps to natural notes to match game's note system
+    const naturalNote = noteName.replace('#', '');
+    const letter = naturalNote;
+    // Calculate staff position (this is approximate - game has more complex logic)
+    const clef = lane === 'mono' ? (globalThis.currentClef || 'treble') : lane;
+    let staffLocalIndex = 0;
+    // Simple mapping for demonstration - in a full implementation, this would need
+    // to match the game's complex staff positioning logic
+    const baseNotes = { 'C': 0, 'D': 1, 'E': 2, 'F': 3, 'G': 4, 'A': 5, 'B': 6 };
+    if (baseNotes[letter] !== undefined) {
+        staffLocalIndex = baseNotes[letter] + (octave - 4) * 7;
+    }
+    return {
+        note: naturalNote,
+        letter: letter,
+        octave: octave,
+        midi: midi,
+        scientific: naturalNote + octave,
+        clef: clef,
+        staffLocalIndex: staffLocalIndex,
+        line: staffLocalIndex // Legacy compatibility
+    };
 }
 // --------------------------- MIDI EVALUATION BRIDGE (ONE LANE AT A TIME) ---------------------------
 function handleNoteOnOneAtATime(midi, velocity) {
@@ -607,6 +622,10 @@ function decrementLivesForLane(lane) {
 }
 // Expose the new one-at-a-time handler
 globalThis.handleNoteOnOneAtATime = handleNoteOnOneAtATime;
+globalThis.lanes = lanes;
+globalThis.pianoOn = pianoOn;
+globalThis.routeClef = routeClef;
+globalThis.spawnNext = spawnNext;
 // --------------------------- EXISTING GENERATORS (RANGE-SAFE) ---------------------------
 /**
  * Melody generator: phrase-like (stepwise bias), small leaps, clamped to lane range.
