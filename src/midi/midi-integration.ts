@@ -1,6 +1,6 @@
 /**
  * MIDI Integration for Note Reading Game
- * Connects the MIDI manager to the lane-based game system
+ * Connects the MIDI manager to the existing game input system
  */
 
 // Extend Window interface for global functions
@@ -19,7 +19,6 @@ declare global {
 import { midiManager } from './midi-manager.js';
 import { MidiDevice, MidiConnectionStatus, MidiNoteMapping, PianoModeSettings } from './midi-types.js';
 import { getNaturalNoteForGame } from './midi-utils.js';
-import { handleMidiNoteOn, initializeLanes } from './lane-system.js';
 
 // Piano Mode state
 let pianoModeSettings: PianoModeSettings = {
@@ -37,17 +36,11 @@ let pianoModeSettings: PianoModeSettings = {
 export function reinitializeMidiAfterRestart(): void {
   console.log('Reinitializing MIDI after game restart...');
   
-  // Re-initialize the lane system
-  initializeLanes();
-  
   // Re-register the note input callback since the game might have reset handlers
   midiManager.clearNoteInputCallbacks();
   
   midiManager.onNoteInput((noteMapping: MidiNoteMapping) => {
-    // Use the lane system for handling MIDI input
-    handleMidiNoteOn(noteMapping.midiNote, 64); // Use default velocity of 64
-    
-    // Legacy support: also call the existing game handlers for compatibility
+    // Get the appropriate note for the game based on Piano Mode settings
     const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
     
     // Call the octave-aware game input handler for Piano Mode strict mode support
@@ -74,15 +67,9 @@ export function initializeMidiIntegration(): void {
     return;
   }
 
-  // Initialize the lane system
-  initializeLanes();
-
   // Register MIDI input callback to route to game input handler
   midiManager.onNoteInput((noteMapping: MidiNoteMapping) => {
-    // Use the lane system for handling MIDI input
-    handleMidiNoteOn(noteMapping.midiNote, 64); // Use default velocity of 64
-    
-    // Legacy support: also call the existing game handlers for compatibility
+    // Get the appropriate note for the game based on Piano Mode settings
     const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
     
     // Call the octave-aware game input handler for Piano Mode strict mode support
