@@ -1,6 +1,6 @@
 /**
  * MIDI Integration for Note Reading Game
- * Connects the MIDI manager to the lane-based game system
+ * Connects the MIDI manager to the existing game input system
  */
 declare global {
     interface Window {
