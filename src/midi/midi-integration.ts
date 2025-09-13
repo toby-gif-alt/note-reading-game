@@ -19,8 +19,7 @@ declare global {
 import { midiManager } from './midi-manager.js';
 import { MidiDevice, MidiConnectionStatus, MidiNoteMapping, PianoModeSettings } from './midi-types.js';
 import { getNaturalNoteForGame } from './midi-utils.js';
-// Using global pianoCore from UMD module loaded via script tag
-declare const pianoCore: any;
+import { handleMidiNoteOn, initializeLanes } from './lane-system.js';
 
 // Piano Mode state
 let pianoModeSettings: PianoModeSettings = {
@@ -38,14 +37,15 @@ let pianoModeSettings: PianoModeSettings = {
 export function reinitializeMidiAfterRestart(): void {
   console.log('Reinitializing MIDI after game restart...');
   
+  // Re-initialize the lane system
+  initializeLanes();
+  
   // Re-register the note input callback since the game might have reset handlers
   midiManager.clearNoteInputCallbacks();
   
   midiManager.onNoteInput((noteMapping: MidiNoteMapping) => {
-    // Use the piano-core engine for handling MIDI input
-    if (typeof pianoCore !== 'undefined') {
-      pianoCore.onNoteOn(noteMapping.midiNote, 64); // Use default velocity of 64
-    }
+    // Use the lane system for handling MIDI input
+    handleMidiNoteOn(noteMapping.midiNote, 64); // Use default velocity of 64
     
     // Legacy support: also call the existing game handlers for compatibility
     const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
@@ -74,12 +74,13 @@ export function initializeMidiIntegration(): void {
     return;
   }
 
+  // Initialize the lane system
+  initializeLanes();
+
   // Register MIDI input callback to route to game input handler
   midiManager.onNoteInput((noteMapping: MidiNoteMapping) => {
-    // Use the piano-core engine for handling MIDI input
-    if (typeof pianoCore !== 'undefined') {
-      pianoCore.onNoteOn(noteMapping.midiNote, 64); // Use default velocity of 64
-    }
+    // Use the lane system for handling MIDI input
+    handleMidiNoteOn(noteMapping.midiNote, 64); // Use default velocity of 64
     
     // Legacy support: also call the existing game handlers for compatibility
     const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
