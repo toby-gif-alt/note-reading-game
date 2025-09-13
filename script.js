@@ -875,6 +875,9 @@ let includeLedgerLines = false; // Will be loaded from settings
 
 // Game objects
 let movingNotes = []; // Notes that move from right to left
+
+// Expose globally for the lane system
+window.movingNotes = movingNotes;
 let flashEffect = { active: false, startTime: 0 };
 let shakeEffect = { active: false, startTime: 0, intensity: 0, duration: 0 };
 let fluctuatingLine = { phase: 0, baseThickness: 3, amplitude: 15 };
@@ -1741,6 +1744,11 @@ async function restartGame() {
   // Clear Piano Mode chord progress tracking to prevent input blocking
   chordProgress.clear();
   
+  // Initialize the lane system for one-at-a-time spawning
+  if (window.laneSystem && typeof window.laneSystem.initializeLanes === 'function') {
+    window.laneSystem.initializeLanes();
+  }
+  
   movingNotes = [];
   explosions = [];
   lasers = [];
@@ -2077,9 +2085,11 @@ function gameLoop() {
     if (window.laneSystem && typeof window.laneSystem.gameTickLoop === 'function') {
       const currentMs = performance.now ? performance.now() : Date.now();
       window.laneSystem.gameTickLoop(currentMs);
+    } else {
+      // Fall back to old spawning system only if new system isn't loaded
+      spawnNote(); // Changed from spawnNoteAndMeteor
     }
     
-    spawnNote(); // Changed from spawnNoteAndMeteor
     updateMovingNotes();
     updateSpaceship();
     updateExplosions();
@@ -2105,9 +2115,33 @@ async function handleNoteInput(userNote) {
   await handleNoteInputWithOctave(userNote, null); // No octave info from keyboard
 }
 
+// Helper function to convert note name and octave to MIDI number
+function noteToMidi(noteName, octave) {
+  const noteMap = { 'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11 };
+  const noteNumber = noteMap[noteName?.toUpperCase()];
+  
+  if (noteNumber === undefined) return null;
+  if (octave === null || octave === undefined) {
+    // Default octave for keyboard input (middle range)
+    octave = 4; 
+  }
+  
+  return (octave + 1) * 12 + noteNumber;
+}
+
 // Enhanced note input handler with octave support for Piano Mode
 async function handleNoteInputWithOctave(userNote, userOctave) {
   if (!gameRunning) return;
+  
+  // Try the new one-at-a-time system first if available
+  if (typeof window.handleNoteOnOneAtATime === 'function') {
+    // Convert note+octave to MIDI and call the new handler
+    const midi = noteToMidi(userNote, userOctave);
+    if (midi !== null) {
+      window.handleNoteOnOneAtATime(midi, 64); // 64 is standard velocity
+      return; // Exit early - new system handles everything
+    }
+  }
   
   // FIXED: Clean up stale chord progress immediately on every input to prevent registration failures
   // This ensures responsive chord input by removing the 5-second throttling that was blocking new input
@@ -2545,6 +2579,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
       
       // Clear all notes on screen when advancing to new level
       movingNotes = [];
+      window.movingNotes = movingNotes;
       
       // Show level popup
       showLevelPopup(level);
@@ -2797,6 +2832,7 @@ if (clefSelect) {
       currentClef = clefSelect.value;
       // Clear existing notes and meteors when changing clef
       movingNotes = [];
+      window.movingNotes = movingNotes;
       meteors = [];
       
       // Update clef display
