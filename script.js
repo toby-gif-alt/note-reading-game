@@ -778,56 +778,14 @@ function drawStaffGreenLine(collisionX, staff, lengthFluctuation) {
 
 // Update life icons display based on current lives
 function updateLifeDisplay() {
-  if (pianoModeActive && currentClef === 'grand') {
-    // Piano Mode: show separate lives for bass and treble
-    const regularLivesContainer = document.getElementById('lives-container');
-    const pianoLivesContainer = document.getElementById('piano-lives-container');
-    
-    if (regularLivesContainer) regularLivesContainer.style.display = 'none';
-    if (pianoLivesContainer) pianoLivesContainer.style.display = 'flex';
-    
-    // Update bass clef lives
-    for (let i = 1; i <= 3; i++) {
-      const lifeElement = document.getElementById(`bassLife${i}`);
-      if (lifeElement) {
-        if (i <= bassLives && bassClefActive) {
-          lifeElement.className = 'life-icon';
-        } else {
-          lifeElement.className = 'life-icon lost';
-        }
-      }
-    }
-    
-    // Update treble clef lives
-    for (let i = 1; i <= 3; i++) {
-      const lifeElement = document.getElementById(`trebleLife${i}`);
-      if (lifeElement) {
-        if (i <= trebleLives && trebleClefActive) {
-          lifeElement.className = 'life-icon';
-        } else {
-          lifeElement.className = 'life-icon lost';
-        }
-      }
-    }
-  } else {
-    // Regular mode: show normal lives
-    const regularLivesContainer = document.getElementById('lives-container');
-    const pianoLivesContainer = document.getElementById('piano-lives-container');
-    
-    if (regularLivesContainer) regularLivesContainer.style.display = 'flex';
-    if (pianoLivesContainer) pianoLivesContainer.style.display = 'none';
-    
-    for (let i = 1; i <= 3; i++) {
-      const lifeElement = document.getElementById(`life${i}`);
-      if (lifeElement) {
-        if (i <= lives) {
-          // Life is still active
-          lifeElement.className = 'life-icon';
-        } else {
-          // Life is lost - make it darker and add red cross
-          lifeElement.className = 'life-icon lost';
-        }
-      }
+  for (let i = 1; i <= 3; i++) {
+    const lifeElement = document.getElementById(`life${i}`);
+    if (i <= lives) {
+      // Life is still active
+      lifeElement.className = 'life-icon';
+    } else {
+      // Life is lost - make it darker and add red cross
+      lifeElement.className = 'life-icon lost';
     }
   }
 }
@@ -847,12 +805,7 @@ const rightHandDisplay = document.getElementById('rightHandScore');
 let currentClef = 'treble';
 let currentNoteIdx = 0;
 let score = 0;
-let lives = 3; // Changed from 5 to 3 lives (used for non-piano mode)
-// Piano Mode separate lives for each clef
-let bassLives = 3; // Bass clef lives (left hand)
-let trebleLives = 3; // Treble clef lives (right hand)
-let bassClefActive = true; // Whether bass clef is still active
-let trebleClefActive = true; // Whether treble clef is still active
+let lives = 3; // Changed from 5 to 3 lives
 let notesDestroyed = 0; // Changed from meteorsDestroyed
 let level = 1; // Add level system
 let correctAnswers = 0; // Track correct answers for level progression
@@ -1554,22 +1507,7 @@ function updateMovingNotes() {
       
       createClefExplosion(explosionX, explosionY, 60, 500);
       
-      // Piano Mode: decrement lives based on clef
-      if (pianoModeActive && currentClef === 'grand') {
-        if (note.clef === 'bass' && bassClefActive) {
-          bassLives--;
-          if (bassLives <= 0) {
-            bassClefActive = false;
-          }
-        } else if (note.clef === 'treble' && trebleClefActive) {
-          trebleLives--;
-          if (trebleLives <= 0) {
-            trebleClefActive = false;
-          }
-        }
-      } else {
-        lives--;
-      }
+      lives--;
       
       // Add shake effect - stronger shake for losing a life
       triggerShake(8, 500); // Medium intensity, half second
@@ -1585,17 +1523,7 @@ function updateMovingNotes() {
       // Spawn a replacement note to maintain 10 notes per level
       respawnNote();
       
-      // Check game over condition
-      if (pianoModeActive && currentClef === 'grand') {
-        // Piano Mode: game over only if both clefs are inactive
-        if (!bassClefActive && !trebleClefActive) {
-          gameOver();
-        } else if (!bassClefActive) {
-          feedback.textContent += ' | Bass clef stopped!';
-        } else if (!trebleClefActive) {
-          feedback.textContent += ' | Treble clef stopped!';
-        }
-      } else if (lives <= 0) {
+      if (lives <= 0) {
         gameOver();
       }
     }
@@ -1709,12 +1637,7 @@ function checkAndSaveHighScore() {
 // Restart game
 async function restartGame() {
   gameRunning = true;
-  lives = 3; // New 3-life system (for non-piano mode)
-  // Reset Piano Mode separate lives
-  bassLives = 3;
-  trebleLives = 3;
-  bassClefActive = true;
-  trebleClefActive = true;
+  lives = 3; // New 3-life system
   notesDestroyed = 0;
   score = 0;
   level = 1;
@@ -1857,8 +1780,8 @@ function pickRandomNote() {
       
       const chosenHand = activeHands[Math.floor(Math.random() * activeHands.length)];
       
-      if (chosenHand === 'left' && leftHandActive && bassClefActive) {
-        // Generate for left hand (bass clef) - only if bass clef is active
+      if (chosenHand === 'left' && leftHandActive) {
+        // Generate for left hand (bass clef)
         const bassNotes = getNotesForPianoModeHand(leftHandMode, 'bass', availableNotes);
         if (bassNotes.length > 0) {
           if (leftHandMode === 'chords' && bassNotes.length >= 2) {
@@ -1869,8 +1792,8 @@ function pickRandomNote() {
             return bassNotes[randomIndex];
           }
         }
-      } else if (chosenHand === 'right' && rightHandActive && trebleClefActive) {
-        // Generate for right hand (treble clef) - only if treble clef is active
+      } else if (chosenHand === 'right' && rightHandActive) {
+        // Generate for right hand (treble clef)
         const trebleNotes = getNotesForPianoModeHand(rightHandMode, 'treble', availableNotes);
         if (trebleNotes.length > 0) {
           if (rightHandMode === 'chords' && trebleNotes.length >= 2) {
@@ -1879,29 +1802,6 @@ function pickRandomNote() {
             // Melody mode or not enough notes for chord
             const randomIndex = Math.floor(Math.random() * trebleNotes.length);
             return trebleNotes[randomIndex];
-          }
-        }
-      }
-      
-      // If the chosen hand is inactive, try the other hand
-      if ((chosenHand === 'left' && !bassClefActive && rightHandActive && trebleClefActive)) {
-        const trebleNotes = getNotesForPianoModeHand(rightHandMode, 'treble', availableNotes);
-        if (trebleNotes.length > 0) {
-          if (rightHandMode === 'chords' && trebleNotes.length >= 2) {
-            return generateChord(trebleNotes);
-          } else {
-            const randomIndex = Math.floor(Math.random() * trebleNotes.length);
-            return trebleNotes[randomIndex];
-          }
-        }
-      } else if ((chosenHand === 'right' && !trebleClefActive && leftHandActive && bassClefActive)) {
-        const bassNotes = getNotesForPianoModeHand(leftHandMode, 'bass', availableNotes);
-        if (bassNotes.length > 0) {
-          if (leftHandMode === 'chords' && bassNotes.length >= 2) {
-            return generateChord(bassNotes);
-          } else {
-            const randomIndex = Math.floor(Math.random() * bassNotes.length);
-            return bassNotes[randomIndex];
           }
         }
       }
@@ -2132,22 +2032,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
     feedback.style.color = '#d0021b';
     feedback.style.fontSize = '16px';
     
-    // Piano Mode: decrement lives based on clef
-    if (pianoModeActive && currentClef === 'grand') {
-      if (absoluteLeftmostNote.clef === 'bass' && bassClefActive) {
-        bassLives--;
-        if (bassLives <= 0) {
-          bassClefActive = false;
-        }
-      } else if (absoluteLeftmostNote.clef === 'treble' && trebleClefActive) {
-        trebleLives--;
-        if (trebleLives <= 0) {
-          trebleClefActive = false;
-        }
-      }
-    } else {
-      lives--;
-    }
+    lives--;
     
     // Add light shake effect for wrong input order
     triggerShake(3, 200);
@@ -2651,22 +2536,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
       }
     }
     
-    // Piano Mode: decrement lives based on clef
-    if (pianoModeActive && currentClef === 'grand' && leftmostNote) {
-      if (leftmostNote.clef === 'bass' && bassClefActive) {
-        bassLives--;
-        if (bassLives <= 0) {
-          bassClefActive = false;
-        }
-      } else if (leftmostNote.clef === 'treble' && trebleClefActive) {
-        trebleLives--;
-        if (trebleLives <= 0) {
-          trebleClefActive = false;
-        }
-      }
-    } else {
-      lives--;
-    }
+    lives--;
     
     // Add light shake effect for wrong answer
     triggerShake(3, 200); // Light intensity, short duration
@@ -2706,17 +2576,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
     
     // Don't immediately spawn a new note - let the current one finish flashing
     
-    // Check game over condition
-    if (pianoModeActive && currentClef === 'grand') {
-      // Piano Mode: game over only if both clefs are inactive
-      if (!bassClefActive && !trebleClefActive) {
-        gameOver();
-      } else if (!bassClefActive) {
-        feedback.textContent += ' | Bass clef stopped!';
-      } else if (!trebleClefActive) {
-        feedback.textContent += ' | Treble clef stopped!';
-      }
-    } else if (lives <= 0) {
+    if (lives <= 0) {
       gameOver();
     }
   }
