@@ -1723,6 +1723,56 @@ async function restartGame() {
   leftHandScore = 0;
   rightHandScore = 0;
   
+  // Initialize piano-core engine
+  if (typeof pianoCore !== 'undefined') {
+    const pianoOn = !!gameSettings?.pianoMode?.enabled;
+    pianoCore.init({
+      pianoModeActive: pianoOn,
+      level: level,
+      bassLives: bassLives,
+      trebleLives: trebleLives,
+      monoLives: lives,
+      modes: {
+        // For now using default modes - can be configured from menu later
+        bass: 'chord',
+        treble: 'melody', 
+        mono: 'melody'
+      }
+    });
+
+    // Wire UI callbacks
+    pianoCore.configureCallbacks({
+      onLives(lane, livesCount) {
+        // Update the appropriate lives counter based on lane
+        if (lane === 'bass') {
+          bassLives = livesCount;
+          bassClefActive = livesCount > 0;
+        } else if (lane === 'treble') {
+          trebleLives = livesCount;
+          trebleClefActive = livesCount > 0;
+        } else { // mono
+          lives = livesCount;
+        }
+        updateLifeDisplay();
+      },
+      onSuccess(lane, target) {
+        // Handle successful target hit
+        console.log(`Success in ${lane} lane:`, target);
+      },
+      onFail(lane, target, why) {
+        // Handle failed target
+        console.log(`Fail in ${lane} lane:`, target, 'Reason:', why);
+      },
+      onLaneDisabled(lane) {
+        console.log(`Lane ${lane} disabled`);
+      },
+      onGameOver(reason) {
+        console.log(`Game over: ${reason}`);
+        // Could trigger existing game over logic here
+      }
+    });
+  }
+  
   // Hide Piano Mode controls during gameplay
   const pianoModeControls = document.getElementById('pianoModeControls');
   if (pianoModeControls) {
