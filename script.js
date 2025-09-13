@@ -285,7 +285,7 @@ let chordProgress = new Map(); // chordId -> { pressedNotes: Set, timestamps: Ma
 // FIXED: Now called immediately on every input event instead of being throttled
 function cleanupStaleChordProgress() {
   const currentTime = Date.now();
-  const maxAge = 1000; // 1 second max age for improved responsiveness
+  const maxAge = 5000; // 5 seconds - reduced from 10 seconds to prevent excessive accumulation
   
   for (const [chordId, chordData] of chordProgress.entries()) {
     // Remove entries that are too old or reference notes that no longer exist
@@ -297,16 +297,16 @@ function cleanupStaleChordProgress() {
     }
   }
   
-  // Simple overflow handling: if too many entries, clear the oldest ones
+  // Additional safety check: if chordProgress gets too large, clear the oldest entries
   if (chordProgress.size > 10) {
+    // Convert to array, sort by firstPressTime, keep only the 5 most recent
     const entries = Array.from(chordProgress.entries());
-    entries.sort((a, b) => a[1].firstPressTime - b[1].firstPressTime); // Sort oldest first
+    entries.sort((a, b) => b[1].firstPressTime - a[1].firstPressTime);
     
-    // Remove oldest entries until we're under the limit
-    const entriesToRemove = chordProgress.size - 5;
-    for (let i = 0; i < entriesToRemove; i++) {
-      chordProgress.delete(entries[i][0]);
-    }
+    chordProgress.clear();
+    entries.slice(0, 5).forEach(([id, data]) => {
+      chordProgress.set(id, data);
+    });
   }
 }
 
@@ -2074,7 +2074,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
       
       // Track which notes have been pressed with timestamps for grace period
       const currentTime = Date.now();
-      const gracePeriodsMs = 100; // Simplified to 100ms grace period for improved responsiveness
+      const gracePeriodsMs = 300; // Increased to 300ms grace period for more forgiving chord completion
       
       if (!chordProgress.has(chordId)) {
         chordProgress.set(chordId, {
@@ -2085,13 +2085,16 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
       }
       const chordData = chordProgress.get(chordId);
       
-      // Check if grace period has expired - if so, reset immediately
+      // Check if we're still within the grace period or if this is a continuation of the same chord
       const timeSinceFirstPress = currentTime - chordData.firstPressTime;
-      if (timeSinceFirstPress > gracePeriodsMs) {
-        // Grace period expired - reset and start fresh
-        chordData.pressedNotes.clear();
-        chordData.timestamps.clear();
-        chordData.firstPressTime = currentTime;
+      if (timeSinceFirstPress > gracePeriodsMs && chordData.pressedNotes.size > 0) {
+        // If grace period expired but we had some progress, be more lenient
+        // Only reset if we've been completely idle for a while
+        if (timeSinceFirstPress > gracePeriodsMs * 3) {
+          chordData.pressedNotes.clear();
+          chordData.timestamps.clear();
+          chordData.firstPressTime = currentTime;
+        }
       }
       
       // Add this note to pressed notes with timestamp
