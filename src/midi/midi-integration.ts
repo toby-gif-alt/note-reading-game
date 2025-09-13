@@ -82,21 +82,18 @@ export function initializeMidiIntegration(): void {
     // Use the lane system for handling MIDI input
     handleMidiNoteOn(noteMapping.midiNote, 64); // Use default velocity of 64
     
-    // Legacy support: only call legacy handlers in Normal Mode to avoid conflicts
-    if (!pianoModeSettings.isActive) {
-      const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
-      
-      // Call the octave-aware game input handler for Normal Mode
-      if (typeof (window as any).handleNoteInputWithOctave === 'function') {
-        (window as any).handleNoteInputWithOctave(noteForGame, noteMapping.octave);
-      } else if (typeof (window as any).handleNoteInput === 'function') {
-        // Fallback to regular handler if octave-aware version not available
-        (window as any).handleNoteInput(noteForGame);
-      }
+    // Legacy support: also call the existing game handlers for compatibility
+    const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
+    
+    // Call the octave-aware game input handler for Piano Mode strict mode support
+    if (typeof (window as any).handleNoteInputWithOctave === 'function') {
+      (window as any).handleNoteInputWithOctave(noteForGame, noteMapping.octave);
+    } else if (typeof (window as any).handleNoteInput === 'function') {
+      // Fallback to regular handler if octave-aware version not available
+      (window as any).handleNoteInput(noteForGame);
     }
     
     // Visual feedback for MIDI input
-    const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
     highlightMidiInput(noteForGame);
   });
 
