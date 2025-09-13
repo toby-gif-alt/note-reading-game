@@ -186,6 +186,13 @@ function dispatchNoteOn(midi: number, velocity: number): void {
   // If game is paused/not started, early-out only if that is TRUE
   if (!(globalThis as any).gameRunning) return;
   
+  // Call the new one-at-a-time MIDI evaluation bridge
+  if (typeof (globalThis as any).handleNoteOnOneAtATime === 'function') {
+    (globalThis as any).handleNoteOnOneAtATime(midi, velocity);
+    return;
+  }
+  
+  // Fallback to existing logic if the new handler isn't loaded yet
   if (!_isPianoOn()) return; // Normal Mode already handled by existing code
 
   const clef = _routeClefByMidi(midi);

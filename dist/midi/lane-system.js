@@ -7,6 +7,37 @@ const BASS_MAX_MIDI = 59; // B3
 const TREBLE_MIN_MIDI = 60; // C4
 const CHORD_WINDOW_MS = 100; // milliseconds
 const CHORD_SPAWN_MULTIPLIER = 1.25; // chords spawn 25% slower than normal at same level
+// === Clef split & margins ===
+const RIGHT_MARGIN_FRAC = 0.08; // 8% screen width from right edge
+// === Mode flags (reuse your settings store if present) ===
+globalThis.settings = globalThis.settings || {};
+const settings = globalThis.settings;
+if (typeof settings.pianoMode === 'undefined')
+    settings.pianoMode = false;
+if (typeof settings.strictOctave === 'undefined')
+    settings.strictOctave = false;
+// Per-clef play mode: 'normal' | 'chord' | 'melody'
+settings.playMode = settings.playMode || { bass: 'normal', treble: 'normal' };
+// === Simple speed curve (px/s) ===
+function speedForLevel(level) {
+    const base = 220;
+    const inc = 15;
+    const v = base + inc * Math.max(0, Number(level || 0));
+    return Math.min(520, Math.max(160, v));
+}
+// === Routing ===
+function pianoOn() {
+    return !!(typeof globalThis.pianoModeActive !== 'undefined' ? globalThis.pianoModeActive : settings.pianoMode);
+}
+function routeClef(midi) {
+    return midi <= BASS_MAX_MIDI ? 'bass' : 'treble';
+}
+// === Match function (strict octave toggle) ===
+function matchesTarget(midi, targetMidi) {
+    if (settings.strictOctave)
+        return midi === targetMidi;
+    return (midi % 12) === (targetMidi % 12);
+}
 // === Piano Mode split (B3/C4) ===
 function _routeClefByMidi(midi) {
     return midi <= BASS_MAX_MIDI ? 'bass' : 'treble';
@@ -14,6 +45,18 @@ function _routeClefByMidi(midi) {
 function _isPianoOn() {
     // Prefer existing flag; fall back to settings if present
     return !!(typeof globalThis.pianoModeActive !== 'undefined' ? globalThis.pianoModeActive : (globalThis.gameSettings && globalThis.gameSettings.pianoMode));
+}
+// === Lane state (one-at-a-time queues) ===
+const lanes = {
+    bass: { active: null, phraseIndex: 0, phraseSize: 0 },
+    treble: { active: null, phraseIndex: 0, phraseSize: 0 },
+    mono: { active: null, phraseIndex: 0, phraseSize: 0 }, // used when piano is OFF
+};
+function laneForPlay() { return pianoOn() ? ['bass', 'treble'] : ['mono']; }
+function clearLane(l) {
+    lanes[l].active = null;
+    lanes[l].phraseIndex = 0;
+    lanes[l].phraseSize = 0;
 }
 // --------------------------- GLOBAL STATE ---------------------------
 const laneStates = new Map();
@@ -296,7 +339,275 @@ export function gameTickLoop(currentMs) {
     }
     // requestAnimationFrame/gameLoop re-schedule is handled elsewhere.
 }
-// --------------------------- GENERATORS (RANGE-SAFE) ---------------------------
+// --------------------------- SPAWNING (single active target; auto after resolve) ---------------------------
+function spawnX() {
+    const w = (typeof globalThis.getCanvasWidth === 'function') ? globalThis.getCanvasWidth() : (globalThis.window?.innerWidth || 1024);
+    return Math.round(w * (1 - RIGHT_MARGIN_FRAC)); // right edge with margin
+}
+// Build next target for a lane based on its playMode
+function buildNextTarget(lane) {
+    const mode = pianoOn() ? (globalThis.settings.playMode[lane] || 'normal') : 'normal';
+    if (mode === 'chord') {
+        const chord = nextChordInRange(lane);
+        return { kind: 'chord', mids: chord, id: 'C_' + lane + '_' + Date.now() };
+    }
+    if (mode === 'melody') {
+        const phrase = nextMelodyPhraseInRange(lane); // array of 3-5 midis
+        return { kind: 'melodyPhrase', mids: phrase, id: 'MP_' + lane + '_' + Date.now() };
+    }
+    // normal
+    const midi = nextSingleNoteInRange(lane);
+    return { kind: 'melody', midi, id: 'M_' + lane + '_' + Date.now() };
+}
+function spawnNext(lane) {
+    if (lanes[lane].active)
+        return; // one at a time
+    const t = buildNextTarget(lane);
+    lanes[lane].active = t;
+    if (t.kind === 'melodyPhrase') {
+        lanes[lane].phraseIndex = 0;
+        lanes[lane].phraseSize = t.mids.length;
+    }
+    const speed = speedForLevel(globalThis.gameLevel || globalThis.level || 1);
+    // Map this to your real visual spawn call
+    spawnVisualTarget(lane, t, { x: spawnX(), speedPxPerSec: speed });
+}
+// Call this when a target finishes (success/fail/miss). It auto-spawns the next one.
+function resolveAndRespawn(lane, result) {
+    // Remove visuals for the resolved target (map to your renderer)
+    if (typeof globalThis.removeVisualTarget === 'function') {
+        globalThis.removeVisualTarget(lane, lanes[lane].active);
+    }
+    lanes[lane].active = null;
+    lanes[lane].phraseIndex = 0;
+    lanes[lane].phraseSize = 0;
+    // Immediately spawn the next
+    spawnNext(lane);
+}
+function spawnVisualTarget(lane, target, options) {
+    // Map to existing game's spawn system
+    if (typeof globalThis.createLaneTarget === 'function') {
+        globalThis.createLaneTarget(lane, target);
+    }
+    else if (typeof globalThis.spawnNoteForLane === 'function') {
+        globalThis.spawnNoteForLane(lane, target, options);
+    }
+    else {
+        // Fallback to creating a visual target in movingNotes array
+        const movingNotes = globalThis.movingNotes;
+        if (movingNotes && Array.isArray(movingNotes)) {
+            if (target.kind === 'melody') {
+                // Create a single note
+                const note = globalThis.midiToNote ? globalThis.midiToNote(target.midi) : { note: 'C', octave: 4 };
+                movingNotes.push({
+                    clef: lane === 'mono' ? (globalThis.currentClef || 'treble') : lane,
+                    note: note.note,
+                    octave: note.octave,
+                    midiNote: target.midi,
+                    id: target.id,
+                    x: options.x,
+                    speed: options.speedPxPerSec / 60, // convert to px per frame assuming 60fps
+                    kind: 'melody'
+                });
+            }
+            else if (target.kind === 'chord') {
+                // Create a chord target
+                movingNotes.push({
+                    clef: lane === 'mono' ? (globalThis.currentClef || 'treble') : lane,
+                    kind: 'chord',
+                    mids: target.mids,
+                    id: target.id,
+                    x: options.x,
+                    speed: options.speedPxPerSec / 60,
+                    isChord: true
+                });
+            }
+            else if (target.kind === 'melodyPhrase') {
+                // Create a phrase target (for now, show first note)
+                const firstMidi = target.mids[0];
+                const note = globalThis.midiToNote ? globalThis.midiToNote(firstMidi) : { note: 'C', octave: 4 };
+                movingNotes.push({
+                    clef: lane === 'mono' ? (globalThis.currentClef || 'treble') : lane,
+                    note: note.note,
+                    octave: note.octave,
+                    midiNote: firstMidi,
+                    id: target.id,
+                    x: options.x,
+                    speed: options.speedPxPerSec / 60,
+                    kind: 'melodyPhrase',
+                    mids: target.mids,
+                    phraseIndex: 0
+                });
+            }
+        }
+    }
+}
+// --------------------------- GENERATORS (RANGE-SAFE & PHRASE-LIKE) ---------------------------
+function clamp(n, lo, hi) {
+    return Math.max(lo, Math.min(hi, n));
+}
+function laneRange(lane) {
+    if (!pianoOn() || lane === 'mono')
+        return { min: 36, max: 84 }; // keep your previous overall range
+    return lane === 'bass' ? { min: 21, max: BASS_MAX_MIDI } : { min: TREBLE_MIN_MIDI, max: 96 };
+}
+function nextSingleNoteInRange(lane) {
+    const r = laneRange(lane);
+    const steps = [-2, -1, -1, 1, 1, 2, 2, 3, -3];
+    const base = Math.round((r.min + r.max) / 2);
+    const pick = base + steps[Math.floor(Math.random() * steps.length)];
+    return clamp(pick, r.min, r.max);
+}
+function nextChordInRange(lane) {
+    const r = laneRange(lane);
+    // simple triad root selection inside range
+    const root = clamp(r.min + Math.floor(Math.random() * (r.max - r.min - 7)), r.min, r.max - 7);
+    const tones = [root, root + 4, root + 7].filter(n => n >= r.min && n <= r.max);
+    return Array.from(new Set(tones));
+}
+function nextMelodyPhraseInRange(lane) {
+    const r = laneRange(lane);
+    const size = 3 + Math.floor(Math.random() * 3); // 3..5
+    const arr = [];
+    let cur = Math.round((r.min + r.max) / 2);
+    for (let i = 0; i < size; i++) {
+        const step = [-2, -1, 1, 2, 2, -2, 1, -1, 3, -3][Math.floor(Math.random() * 10)];
+        cur = clamp(cur + step, r.min, r.max);
+        arr.push(cur);
+    }
+    return arr;
+}
+// --------------------------- MIDI EVALUATION BRIDGE (ONE LANE AT A TIME) ---------------------------
+function handleNoteOnOneAtATime(midi, velocity) {
+    var _a, _b;
+    const lanesToCheck = pianoOn() ? ['bass', 'treble'] : ['mono'];
+    const targetLane = pianoOn() ? routeClef(midi) : 'mono';
+    const L = targetLane;
+    if (!lanes[L].active) { // lane empty → spawn first
+        spawnNext(L);
+    }
+    const t = lanes[L].active;
+    if (!t)
+        return;
+    // Melody (single)
+    if (t.kind === 'melody') {
+        if (matchesTarget(midi, t.midi)) {
+            onSuccess && onSuccess(L, t); // map to your success FX/score
+            resolveAndRespawn(L, 'success');
+        }
+        else {
+            onFail && onFail(L, t, 'melody-wrong'); // FX
+            decrementLivesForLane(L); // map to your lives system
+            resolveAndRespawn(L, 'fail');
+        }
+        return;
+    }
+    // Chord (single chord target, one at a time)
+    if (t.kind === 'chord') {
+        // transient window start + collected stored on lanes object
+        (_a = lanes[L]).__chordStart ?? (_a.__chordStart = null);
+        (_b = lanes[L]).__chordHits ?? (_b.__chordHits = new Set());
+        const tones = new Set(t.mids);
+        if (!tones.has(midi)) {
+            onFail && onFail(L, t, 'chord-stray');
+            decrementLivesForLane(L);
+            lanes[L].__chordHits.clear();
+            lanes[L].__chordStart = null;
+            resolveAndRespawn(L, 'fail');
+            return;
+        }
+        if (lanes[L].__chordStart === null) {
+            const started = performance.now();
+            lanes[L].__chordStart = started;
+            lanes[L].__chordHits.clear();
+            setTimeout(() => {
+                const still = lanes[L].active;
+                if (!still || still.id !== t.id || still.kind !== 'chord')
+                    return;
+                if (lanes[L].__chordStart !== started)
+                    return;
+                if (lanes[L].__chordHits.size < tones.size) {
+                    onFail && onFail(L, t, 'chord-timeout');
+                    decrementLivesForLane(L);
+                    lanes[L].__chordHits.clear();
+                    lanes[L].__chordStart = null;
+                    resolveAndRespawn(L, 'fail');
+                }
+            }, 100);
+        }
+        lanes[L].__chordHits.add(midi);
+        if (lanes[L].__chordHits.size === tones.size) {
+            onSuccess && onSuccess(L, t);
+            lanes[L].__chordHits.clear();
+            lanes[L].__chordStart = null;
+            resolveAndRespawn(L, 'success');
+        }
+        return;
+    }
+    // Melody phrase (3–5 in order, one at a time)
+    if (t.kind === 'melodyPhrase') {
+        const idx = lanes[L].phraseIndex;
+        const need = t.mids[idx];
+        if (matchesTarget(midi, need)) {
+            lanes[L].phraseIndex++;
+            // update subtarget UI here if you have it
+            if (lanes[L].phraseIndex >= lanes[L].phraseSize) {
+                // phrase complete → award 1 point toward 10
+                addPhrasePoint && addPhrasePoint(L); // map to your scoring (10 needed)
+                onSuccess && onSuccess(L, t);
+                resolveAndRespawn(L, 'success');
+            }
+        }
+        else {
+            onFail && onFail(L, t, 'phrase-wrong');
+            decrementLivesForLane(L);
+            resolveAndRespawn(L, 'fail');
+        }
+        return;
+    }
+}
+// Success/fail/phrase point callback placeholders (map to your existing functions)
+const onSuccess = globalThis.onSuccess || function (lane, target) {
+    console.log('Success:', lane, target);
+};
+const onFail = globalThis.onFail || function (lane, target, reason) {
+    console.log('Fail:', lane, target, reason);
+};
+const addPhrasePoint = globalThis.addPhrasePoint || function (lane) {
+    console.log('Phrase point:', lane);
+};
+function decrementLivesForLane(lane) {
+    if (!pianoOn()) {
+        if (typeof globalThis.lives === 'number') {
+            globalThis.lives = Math.max(0, globalThis.lives - 1);
+            if (typeof globalThis.updateLives === 'function') {
+                globalThis.updateLives(globalThis.lives);
+            }
+        }
+        return;
+    }
+    if (lane === 'bass') {
+        globalThis.bassLives = Math.max(0, (globalThis.bassLives || 0) - 1);
+        if (typeof globalThis.updateLivesUI === 'function') {
+            globalThis.updateLivesUI('bass', globalThis.bassLives);
+        }
+    }
+    if (lane === 'treble') {
+        globalThis.trebleLives = Math.max(0, (globalThis.trebleLives || 0) - 1);
+        if (typeof globalThis.updateLivesUI === 'function') {
+            globalThis.updateLivesUI('treble', globalThis.trebleLives);
+        }
+    }
+    if ((globalThis.bassLives || 0) <= 0 && globalThis.disableBassLane)
+        globalThis.disableBassLane();
+    if ((globalThis.trebleLives || 0) <= 0 && globalThis.disableTrebleLane)
+        globalThis.disableTrebleLane();
+    if ((globalThis.bassLives || 0) <= 0 && (globalThis.trebleLives || 0) <= 0 && globalThis.stopGame)
+        globalThis.stopGame('piano-both-dead');
+}
+// Expose the new one-at-a-time handler
+globalThis.handleNoteOnOneAtATime = handleNoteOnOneAtATime;
+// --------------------------- EXISTING GENERATORS (RANGE-SAFE) ---------------------------
 /**
  * Melody generator: phrase-like (stepwise bias), small leaps, clamped to lane range.
  * Use previous melody note as seed when available; otherwise seed anywhere in range.
@@ -390,9 +701,6 @@ function initializeLanes() {
     }
 }
 // --------------------------- UTILS (IMPLEMENT OR REPLACE) ---------------------------
-function clamp(x, lo, hi) {
-    return Math.min(hi, Math.max(lo, x));
-}
 function seedInRange(min, max) {
     return min + Math.floor(Math.random() * (max - min + 1));
 }
@@ -435,4 +743,37 @@ globalThis.laneSystem = {
     getLaneState,
     updateLaneState
 };
+// --------------------------- UI TOGGLES ---------------------------
+// Wire to existing buttons if present; otherwise add keybinds
+if (typeof document !== 'undefined') {
+    // Strict toggle
+    const btnStrict = document.querySelector('#btn-strict');
+    if (btnStrict) {
+        btnStrict.addEventListener('click', () => {
+            globalThis.settings.strictOctave = !globalThis.settings.strictOctave;
+            console.log('Strict octave:', globalThis.settings.strictOctave);
+        });
+    }
+    // Piano toggle  
+    const btnPiano = document.querySelector('#btn-piano');
+    if (btnPiano) {
+        btnPiano.addEventListener('click', () => {
+            globalThis.settings.pianoMode = !globalThis.settings.pianoMode;
+            globalThis.pianoModeActive = globalThis.settings.pianoMode;
+            console.log('Piano mode:', globalThis.settings.pianoMode);
+        });
+    }
+    // Optional keybinds (keep if you have no buttons)
+    window.addEventListener('keydown', (e) => {
+        if (e.key.toLowerCase() === 's') {
+            globalThis.settings.strictOctave = !globalThis.settings.strictOctave;
+            console.log('Strict octave:', globalThis.settings.strictOctave);
+        }
+        if (e.key.toLowerCase() === 'p') {
+            globalThis.settings.pianoMode = !globalThis.settings.pianoMode;
+            globalThis.pianoModeActive = globalThis.settings.pianoMode;
+            console.log('Piano mode:', globalThis.settings.pianoMode);
+        }
+    });
+}
 //# sourceMappingURL=lane-system.js.map
