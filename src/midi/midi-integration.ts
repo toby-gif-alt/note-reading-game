@@ -21,6 +21,212 @@ import { MidiDevice, MidiConnectionStatus, MidiNoteMapping, PianoModeSettings } 
 import { getNaturalNoteForGame } from './midi-utils.js';
 import { handleMidiNoteOn, initializeLanes } from './lane-system.js';
 
+// Constants for MIDI routing as specified
+const BASS_MAX_MIDI = 59;   // B3
+const TREBLE_MIN_MIDI = 60; // C4
+
+function _isPianoOn(): boolean {
+  return !!(typeof (globalThis as any).pianoModeActive !== 'undefined' ? (globalThis as any).pianoModeActive
+           : ((globalThis as any).gameSettings && (globalThis as any).gameSettings.pianoMode));
+}
+
+function _routeClefByMidi(midi: number): 'bass' | 'treble' {
+  return (midi <= BASS_MAX_MIDI) ? 'bass' : 'treble';
+}
+
+// Per-clef transient chord state 
+const __chordStart   = { bass: null as number | null, treble: null as number | null };
+const __chordHits    = { bass: new Set<number>(), treble: new Set<number>() };
+
+// Tiny helpers (reuse existing UI/life functions if present)
+function _decLife(clef: 'bass' | 'treble'): void {
+  if (!_isPianoOn()) { 
+    if (typeof (globalThis as any).lives === 'number') {
+      (globalThis as any).lives = Math.max(0, (globalThis as any).lives - 1); 
+    }
+    if (typeof (globalThis as any).updateLifeDisplay === 'function') {
+      (globalThis as any).updateLifeDisplay();
+    }
+    return; 
+  }
+  if (clef === 'bass')   { 
+    (globalThis as any).bassLives   = Math.max(0, ((globalThis as any).bassLives   ?? 3) - 1); 
+    if (typeof (globalThis as any).updateLifeDisplay === 'function') {
+      (globalThis as any).updateLifeDisplay();
+    }
+  }
+  if (clef === 'treble') { 
+    (globalThis as any).trebleLives = Math.max(0, ((globalThis as any).trebleLives ?? 3) - 1); 
+    if (typeof (globalThis as any).updateLifeDisplay === 'function') {
+      (globalThis as any).updateLifeDisplay();
+    }
+  }
+}
+
+function _laneAlive(clef: 'bass' | 'treble'): boolean {
+  if (!_isPianoOn()) return (typeof (globalThis as any).lives === 'number' ? (globalThis as any).lives > 0 : true);
+  return clef === 'bass' ? ((globalThis as any).bassLives ?? 1) > 0 : ((globalThis as any).trebleLives ?? 1) > 0;
+}
+
+function _afterLifeChangeStopIfNeeded(): void {
+  if (!_isPianoOn()) return; // Normal Mode unchanged
+  if (((globalThis as any).bassLives ?? 1) <= 0 && typeof (globalThis as any).disableBassLane === 'function') {
+    (globalThis as any).disableBassLane();
+  }
+  if (((globalThis as any).trebleLives ?? 1) <= 0 && typeof (globalThis as any).disableTrebleLane === 'function') {
+    (globalThis as any).disableTrebleLane();
+  }
+  if (((globalThis as any).bassLives ?? 1) <= 0 && ((globalThis as any).trebleLives ?? 1) <= 0 && typeof (globalThis as any).stopGame === 'function') {
+    (globalThis as any).stopGame('piano-both-dead');
+  }
+}
+
+// Bridge functions to connect to main game evaluation
+function _activeMelodyTarget(clef: 'bass' | 'treble'): { midi: number, id: string, kind?: 'melody' } | null {
+  // Map to the main game's movingNotes array - find first melody target for this clef
+  const movingNotes = (globalThis as any).movingNotes;
+  if (!movingNotes || !Array.isArray(movingNotes)) return null;
+  
+  for (const note of movingNotes) {
+    if (note.clef === clef && (!note.kind || note.kind === 'melody')) {
+      return { midi: note.midiNote, id: note.id || note.note + note.octave, kind: 'melody' };
+    }
+  }
+  return null;
+}
+
+function _activeChordTarget(clef: 'bass' | 'treble'): { mids: number[], id: string, kind?: 'chord' } | null {
+  // Map to the main game's movingNotes array - find first chord target for this clef
+  const movingNotes = (globalThis as any).movingNotes;
+  if (!movingNotes || !Array.isArray(movingNotes)) return null;
+  
+  for (const note of movingNotes) {
+    if (note.clef === clef && note.kind === 'chord' && Array.isArray(note.mids)) {
+      return { mids: note.mids, id: note.id || 'chord-' + note.mids.join('-'), kind: 'chord' };
+    }
+  }
+  return null;
+}
+
+function _success(clef: 'bass' | 'treble', target: any): void {
+  // Remove target from movingNotes, play success FX, increment score
+  const movingNotes = (globalThis as any).movingNotes;
+  if (movingNotes && Array.isArray(movingNotes)) {
+    const index = movingNotes.findIndex((note: any) => 
+      (note.id && note.id === target.id) || 
+      (note.midiNote === target.midi) ||
+      (Array.isArray(note.mids) && Array.isArray(target.mids) && 
+       note.mids.length === target.mids.length &&
+       note.mids.every((mid: number) => target.mids.includes(mid)))
+    );
+    if (index !== -1) {
+      movingNotes.splice(index, 1);
+    }
+  }
+  
+  // Play success effects
+  if (typeof (globalThis as any).playCorrectSound === 'function') {
+    (globalThis as any).playCorrectSound();
+  }
+  
+  // Update score
+  (globalThis as any).score = ((globalThis as any).score || 0) + 1;
+  (globalThis as any).correctAnswers = ((globalThis as any).correctAnswers || 0) + 1;
+  
+  // Update displays
+  if (typeof (globalThis as any).updateDisplays === 'function') {
+    (globalThis as any).updateDisplays();
+  }
+}
+
+function _fail(clef: 'bass' | 'treble', target: any, why: string): void {
+  // Remove target from movingNotes, play fail FX, decrement lives
+  const movingNotes = (globalThis as any).movingNotes;
+  if (movingNotes && Array.isArray(movingNotes)) {
+    const index = movingNotes.findIndex((note: any) => 
+      (note.id && note.id === target.id) || 
+      (note.midiNote === target.midi) ||
+      (Array.isArray(note.mids) && Array.isArray(target.mids) && 
+       note.mids.length === target.mids.length &&
+       note.mids.every((mid: number) => target.mids.includes(mid)))
+    );
+    if (index !== -1) {
+      movingNotes.splice(index, 1);
+    }
+  }
+  
+  _decLife(clef);
+  _afterLifeChangeStopIfNeeded();
+  
+  // Play fail effects
+  if (typeof (globalThis as any).playExplosionSound === 'function') {
+    (globalThis as any).playExplosionSound();
+  }
+}
+
+function _modeOf(clef: 'bass' | 'treble'): 'melody' | 'chord' {
+  // Read existing piano mode settings for this lane
+  if (clef === 'bass' && pianoModeSettings.leftHand === 'chords') return 'chord';
+  if (clef === 'treble' && pianoModeSettings.rightHand === 'chords') return 'chord';
+  return 'melody'; // Default to melody so we never no-op
+}
+
+// The main dispatcher as specified
+function dispatchNoteOn(midi: number, velocity: number): void {
+  // If game is paused/not started, early-out only if that is TRUE
+  if (!(globalThis as any).gameRunning) return;
+  
+  if (!_isPianoOn()) return; // Normal Mode already handled by existing code
+
+  const clef = _routeClefByMidi(midi);
+  if (!_laneAlive(clef)) return;
+
+  const mode = _modeOf(clef);
+  if (mode === 'melody') {
+    const t = _activeMelodyTarget(clef);
+    if (!t) return;                // nothing to evaluate
+    if (midi === t.midi) { _success(clef, t); }
+    else { _fail(clef, t, 'melody-wrong'); }
+    return;
+  }
+
+  // mode === 'chord'
+  const chord = _activeChordTarget(clef);
+  if (!chord) return;
+  const tones = new Set(chord.mids);
+
+  // STRAY in same clef -> immediate fail
+  if (!tones.has(midi)) {
+    _fail(clef, chord, 'chord-stray');
+    __chordHits[clef].clear(); __chordStart[clef] = null;
+    return;
+  }
+
+  // First correct tone starts 100ms window
+  if (__chordStart[clef] === null) {
+    const started = performance.now();
+    __chordStart[clef] = started;
+    __chordHits[clef].clear();
+
+    setTimeout(() => {
+      // If still same chord active and not all tones collected -> timeout fail
+      const still = _activeChordTarget(clef);
+      if (!still || still.id !== chord.id) return;
+      if (__chordStart[clef] !== started) return; // already resolved
+      if (__chordHits[clef].size < new Set(still.mids).size) {
+        _fail(clef, still, 'chord-timeout');
+      }
+      __chordHits[clef].clear(); __chordStart[clef] = null;
+    }, 100);
+  }
+
+  __chordHits[clef].add(midi);
+  if (__chordHits[clef].size === new Set(chord.mids).size) {
+    _success(clef, chord);
+    __chordHits[clef].clear(); __chordStart[clef] = null;
+  }
+}
+
 // Piano Mode state
 let pianoModeSettings: PianoModeSettings = {
   isActive: false,
@@ -44,12 +250,14 @@ export function reinitializeMidiAfterRestart(): void {
   midiManager.clearNoteInputCallbacks();
   
   midiManager.onNoteInput((noteMapping: MidiNoteMapping) => {
-    // Use the lane system for handling MIDI input
-    handleMidiNoteOn(noteMapping.midiNote, 64); // Use default velocity of 64
+    // Visual feedback for MIDI input (FIRST)
+    const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
+    highlightMidiInput(noteForGame);
+    
+    // IMPORTANT: CALL THE DISPATCHER right after UI highlight
+    dispatchNoteOn(noteMapping.midiNote, 64);
     
     // Legacy support: also call the existing game handlers for compatibility
-    const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
-    
     // Call the octave-aware game input handler for Piano Mode strict mode support
     if (typeof (window as any).handleNoteInputWithOctave === 'function') {
       (window as any).handleNoteInputWithOctave(noteForGame, noteMapping.octave);
@@ -57,9 +265,6 @@ export function reinitializeMidiAfterRestart(): void {
       // Fallback to regular handler if octave-aware version not available
       (window as any).handleNoteInput(noteForGame);
     }
-    
-    // Visual feedback for MIDI input
-    highlightMidiInput(noteForGame);
   });
   
   // Update UI to reflect current status
@@ -79,13 +284,15 @@ export function initializeMidiIntegration(): void {
 
   // Register MIDI input callback to route to game input handler
   midiManager.onNoteInput((noteMapping: MidiNoteMapping) => {
-    // Use the lane system for handling MIDI input
-    handleMidiNoteOn(noteMapping.midiNote, 64); // Use default velocity of 64
+    // Visual feedback for MIDI input (FIRST)
+    const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
+    highlightMidiInput(noteForGame);
+    
+    // IMPORTANT: CALL THE DISPATCHER right after UI highlight
+    dispatchNoteOn(noteMapping.midiNote, 64);
     
     // Legacy support: only call legacy handlers in Normal Mode to avoid conflicts
     if (!pianoModeSettings.isActive) {
-      const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
-      
       // Call the octave-aware game input handler for Normal Mode
       if (typeof (window as any).handleNoteInputWithOctave === 'function') {
         (window as any).handleNoteInputWithOctave(noteForGame, noteMapping.octave);
@@ -94,10 +301,6 @@ export function initializeMidiIntegration(): void {
         (window as any).handleNoteInput(noteForGame);
       }
     }
-    
-    // Visual feedback for MIDI input
-    const noteForGame = getNaturalNoteForGame(noteMapping.midiNote);
-    highlightMidiInput(noteForGame);
   });
 
   // Set up device connection monitoring
@@ -106,6 +309,18 @@ export function initializeMidiIntegration(): void {
     
     // Activate Piano Mode when device is connected
     pianoModeSettings.isActive = true;
+    (globalThis as any).pianoModeActive = true;
+    
+    // Initialize per-clef lives when Piano Mode turns ON
+    if (_isPianoOn()) {
+      if (typeof (globalThis as any).bassLives === 'undefined')   {
+        (globalThis as any).bassLives = typeof (globalThis as any).lives === 'number' ? (globalThis as any).lives : 3;
+      }
+      if (typeof (globalThis as any).trebleLives === 'undefined') {
+        (globalThis as any).trebleLives = typeof (globalThis as any).lives === 'number' ? (globalThis as any).lives : 3;
+      }
+    }
+    
     updatePianoModeUI();
     
     updateMidiUI();
