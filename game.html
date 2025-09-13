@@ -134,6 +134,13 @@
   <script>
     // Only load MIDI integration if not on a mobile device
     if (!/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+      // Load lane system first
+      const laneSystemScript = document.createElement('script');
+      laneSystemScript.type = 'module';
+      laneSystemScript.src = 'dist/midi/lane-system.js';
+      document.head.appendChild(laneSystemScript);
+      
+      // Then load MIDI integration
       const midiScript = document.createElement('script');
       midiScript.type = 'module';
       midiScript.src = 'dist/midi/midi-integration.js';

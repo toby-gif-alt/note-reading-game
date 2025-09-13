@@ -1764,6 +1764,11 @@ async function restartGame() {
   // Update clef display
   updateClefDisplay();
   
+  // Initialize lane system if available
+  if (window.laneSystem && typeof window.laneSystem.initializeLanes === 'function') {
+    window.laneSystem.initializeLanes();
+  }
+  
   restartBtn.style.display = 'none';
   
   gameLoop();
@@ -2047,6 +2052,11 @@ async function initializeGame() {
   scoreDisplay.textContent = `Score: ${score}`;
   updateHandScoreVisibility(); // Initialize hand score display visibility
   
+  // Initialize lane system if available
+  if (window.laneSystem && typeof window.laneSystem.initializeLanes === 'function') {
+    window.laneSystem.initializeLanes();
+  }
+  
   gameInitialized = true;
   gameLoop();
 }
@@ -2054,6 +2064,12 @@ async function initializeGame() {
 // Main game loop
 function gameLoop() {
   if (gameRunning) {
+    // Update lane system tick if available
+    if (window.laneSystem && typeof window.laneSystem.gameTickLoop === 'function') {
+      const currentMs = performance.now ? performance.now() : Date.now();
+      window.laneSystem.gameTickLoop(currentMs);
+    }
+    
     spawnNote(); // Changed from spawnNoteAndMeteor
     updateMovingNotes();
     updateSpaceship();
