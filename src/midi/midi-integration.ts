@@ -227,6 +227,40 @@ function dispatchNoteOn(midi: number, velocity: number): void {
   }
 }
 
+// Test function for Piano Mode dispatcher (expose globally for testing)
+function testMidiDispatch(midi: number, velocity: number = 64): string {
+  const beforeTargets = (globalThis as any).movingNotes ? (globalThis as any).movingNotes.length : 0;
+  const beforeScore = (globalThis as any).score || 0;
+  const beforeBassLives = (globalThis as any).bassLives || 0;
+  const beforeTrebleLives = (globalThis as any).trebleLives || 0;
+  
+  dispatchNoteOn(midi, velocity);
+  
+  const afterTargets = (globalThis as any).movingNotes ? (globalThis as any).movingNotes.length : 0;
+  const afterScore = (globalThis as any).score || 0;
+  const afterBassLives = (globalThis as any).bassLives || 0;
+  const afterTrebleLives = (globalThis as any).trebleLives || 0;
+  
+  const result = {
+    midi,
+    clef: _routeClefByMidi(midi),
+    pianoMode: _isPianoOn(),
+    beforeTargets,
+    afterTargets,
+    beforeScore,
+    afterScore,
+    beforeBassLives,
+    afterBassLives,
+    beforeTrebleLives,
+    afterTrebleLives,
+    targetsChanged: beforeTargets !== afterTargets,
+    scoreChanged: beforeScore !== afterScore,
+    livesChanged: beforeBassLives !== afterBassLives || beforeTrebleLives !== afterTrebleLives
+  };
+  
+  return JSON.stringify(result, null, 2);
+}
+
 // Piano Mode state
 let pianoModeSettings: PianoModeSettings = {
   isActive: false,
@@ -563,6 +597,11 @@ export function updatePianoModeSettings(settings: Partial<PianoModeSettings>): v
   localStorage.setItem('pianoModeSettings', JSON.stringify(pianoModeSettings));
 }
 
+// Export test function for debugging
+export function testMidiDispatcherExternal(midi: number, velocity: number = 64): string {
+  return testMidiDispatch(midi, velocity);
+}
+
 /**
  * Initialize Piano Mode UI event listeners
  */
@@ -607,11 +646,17 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     initializeMidiIntegration();
     initializePianoModeUI();
+    
+    // Make test function globally accessible for testing
+    (globalThis as any).testMidiDispatcher = testMidiDispatch;
   });
 } else {
   // If document is already loaded, initialize immediately
   initializeMidiIntegration();
   initializePianoModeUI();
+  
+  // Make test function globally accessible for testing
+  (globalThis as any).testMidiDispatcher = testMidiDispatch;
 }
 
 // Expose functions globally for integration with existing game code
