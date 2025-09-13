@@ -48,4 +48,3 @@ export declare function getPianoModeSettings(): PianoModeSettings;
  * Update Piano Mode settings
  */
 export declare function updatePianoModeSettings(settings: Partial<PianoModeSettings>): void;
-export declare function testMidiDispatcherExternal(midi: number, velocity?: number): string;
