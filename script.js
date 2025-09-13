@@ -778,7 +778,11 @@ function drawStaffGreenLine(collisionX, staff, lengthFluctuation) {
 
 // Update life icons display based on current lives
 function updateLifeDisplay() {
-  if (pianoModeActive && currentClef === 'grand') {
+  // Use piano-core engine to determine if we're in piano mode
+  const isPianoMode = typeof pianoCore !== 'undefined' && 
+    pianoCore.lane && pianoCore.lane('bass').enabled && pianoCore.lane('treble').enabled;
+  
+  if (isPianoMode) {
     // Piano Mode: show separate lives for bass and treble
     const regularLivesContainer = document.getElementById('lives-container');
     const pianoLivesContainer = document.getElementById('piano-lives-container');
@@ -786,11 +790,15 @@ function updateLifeDisplay() {
     if (regularLivesContainer) regularLivesContainer.style.display = 'none';
     if (pianoLivesContainer) pianoLivesContainer.style.display = 'flex';
     
+    // Get current lives from piano-core engine
+    const bassLaneState = pianoCore.lane('bass');
+    const trebleLaneState = pianoCore.lane('treble');
+    
     // Update bass clef lives
     for (let i = 1; i <= 3; i++) {
       const lifeElement = document.getElementById(`bassLife${i}`);
       if (lifeElement) {
-        if (i <= bassLives && bassClefActive) {
+        if (i <= bassLaneState.lives && bassLaneState.enabled) {
           lifeElement.className = 'life-icon';
         } else {
           lifeElement.className = 'life-icon lost';
@@ -802,7 +810,7 @@ function updateLifeDisplay() {
     for (let i = 1; i <= 3; i++) {
       const lifeElement = document.getElementById(`trebleLife${i}`);
       if (lifeElement) {
-        if (i <= trebleLives && trebleClefActive) {
+        if (i <= trebleLaneState.lives && trebleLaneState.enabled) {
           lifeElement.className = 'life-icon';
         } else {
           lifeElement.className = 'life-icon lost';
@@ -817,10 +825,19 @@ function updateLifeDisplay() {
     if (regularLivesContainer) regularLivesContainer.style.display = 'flex';
     if (pianoLivesContainer) pianoLivesContainer.style.display = 'none';
     
+    // Get lives from piano-core mono lane or fallback to global variable
+    let currentLives = lives; // fallback
+    if (typeof pianoCore !== 'undefined' && pianoCore.lane) {
+      const monoLane = pianoCore.lane('mono');
+      if (monoLane) {
+        currentLives = monoLane.lives;
+      }
+    }
+    
     for (let i = 1; i <= 3; i++) {
       const lifeElement = document.getElementById(`life${i}`);
       if (lifeElement) {
-        if (i <= lives) {
+        if (i <= currentLives) {
           // Life is still active
           lifeElement.className = 'life-icon';
         } else {
@@ -1672,18 +1689,34 @@ function updateMovingNotes() {
       // Spawn a replacement note to maintain 10 notes per level
       respawnNote();
       
-      // Check game over condition
-      if (pianoModeActive && currentClef === 'grand') {
-        // Piano Mode: game over only if both clefs are inactive
-        if (!bassClefActive && !trebleClefActive) {
+      // Check game over condition using piano-core engine state
+      if (typeof pianoCore !== 'undefined' && pianoCore.lane) {
+        const bassLane = pianoCore.lane('bass');
+        const trebleLane = pianoCore.lane('treble');
+        const monoLane = pianoCore.lane('mono');
+        
+        // Check if we're in piano mode (both bass and treble lanes exist and were initially enabled)
+        const wasPianoMode = bassLane && trebleLane && (bassLane.lives > 0 || trebleLane.lives > 0 || 
+          !bassLane.enabled || !trebleLane.enabled); // At least one lane was active or got disabled
+        
+        if (wasPianoMode) {
+          // Piano Mode: game over only if both bass and treble lanes are disabled
+          if (!bassLane.enabled && !trebleLane.enabled) {
+            gameOver();
+          } else if (!bassLane.enabled) {
+            feedback.textContent += ' | Bass clef stopped!';
+          } else if (!trebleLane.enabled) {
+            feedback.textContent += ' | Treble clef stopped!';
+          }
+        } else if (monoLane && !monoLane.enabled) {
+          // Regular mode: game over if mono lane is disabled
           gameOver();
-        } else if (!bassClefActive) {
-          feedback.textContent += ' | Bass clef stopped!';
-        } else if (!trebleClefActive) {
-          feedback.textContent += ' | Treble clef stopped!';
         }
-      } else if (lives <= 0) {
-        gameOver();
+      } else {
+        // Fallback to old logic if piano-core not available
+        if (lives <= 0) {
+          gameOver();
+        }
       }
     }
     
@@ -1843,19 +1876,84 @@ async function restartGame() {
         updateLifeDisplay();
       },
       onSuccess(lane, target) {
-        // Handle successful target hit
+        // Handle successful target hit - integrate with existing scoring system
         console.log(`Success in ${lane} lane:`, target);
+        
+        // Update score and stats like the existing system
+        score += 10; // Base score
+        notesDestroyed++;
+        correctAnswers++;
+        
+        // Update hand-specific scoring for piano mode
+        if (lane === 'bass') {
+          leftHandScore += 10;
+        } else if (lane === 'treble') {
+          rightHandScore += 10;
+        }
+        
+        // Update display elements
+        if (scoreDisplay) scoreDisplay.textContent = `Score: ${score}`;
+        if (notesDestroyedDisplay) notesDestroyedDisplay.textContent = `Notes Destroyed: ${notesDestroyed}`;
+        
+        // Level progression logic
+        if (correctAnswers >= 10) {
+          level++;
+          correctAnswers = 0;
+          if (feedback) {
+            feedback.textContent = `Level ${level}!`;
+            feedback.style.color = '#4CAF50';
+          }
+        }
       },
       onFail(lane, target, why) {
-        // Handle failed target
+        // Handle failed target - integrate with existing feedback
         console.log(`Fail in ${lane} lane:`, target, 'Reason:', why);
+        
+        // Provide user feedback about the failure
+        if (feedback) {
+          let message = 'Wrong!';
+          if (why === 'melody-wrong-note') {
+            message = 'Wrong note!';
+          } else if (why === 'chord-stray') {
+            message = 'Wrong chord note!';
+          } else if (why === 'chord-timeout') {
+            message = 'Chord too slow!';
+          }
+          
+          feedback.textContent = message;
+          feedback.style.color = '#d0021b';
+          feedback.style.fontSize = '16px';
+        }
+        
+        // Trigger visual effects (explosion, flash, etc.)
+        triggerShake(3, 200); // Light shake for wrong input
+        
+        // Flash effect
+        flashEffect.active = true;
+        flashEffect.startTime = Date.now();
+        
+        playSound('explosionLoseLive');
       },
       onLaneDisabled(lane) {
         console.log(`Lane ${lane} disabled`);
+        
+        // Update feedback to inform user
+        if (feedback) {
+          if (lane === 'bass') {
+            feedback.textContent += ' | Bass clef stopped!';
+          } else if (lane === 'treble') {
+            feedback.textContent += ' | Treble clef stopped!';
+          } else {
+            feedback.textContent = 'No more lives!';
+          }
+        }
       },
       onGameOver(reason) {
         console.log(`Game over: ${reason}`);
-        // Could trigger existing game over logic here
+        // Trigger the existing game over logic
+        if (typeof gameOver === 'function') {
+          gameOver();
+        }
       }
     });
   }
@@ -2864,18 +2962,34 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
     
     // Don't immediately spawn a new note - let the current one finish flashing
     
-    // Check game over condition
-    if (pianoModeActive && currentClef === 'grand') {
-      // Piano Mode: game over only if both clefs are inactive
-      if (!bassClefActive && !trebleClefActive) {
+    // Check game over condition using piano-core engine state
+    if (typeof pianoCore !== 'undefined' && pianoCore.lane) {
+      const bassLane = pianoCore.lane('bass');
+      const trebleLane = pianoCore.lane('treble');
+      const monoLane = pianoCore.lane('mono');
+      
+      // Check if we're in piano mode (both bass and treble lanes exist and were initially enabled)
+      const wasPianoMode = bassLane && trebleLane && (bassLane.lives > 0 || trebleLane.lives > 0 || 
+        !bassLane.enabled || !trebleLane.enabled); // At least one lane was active or got disabled
+      
+      if (wasPianoMode) {
+        // Piano Mode: game over only if both bass and treble lanes are disabled
+        if (!bassLane.enabled && !trebleLane.enabled) {
+          gameOver();
+        } else if (!bassLane.enabled) {
+          feedback.textContent += ' | Bass clef stopped!';
+        } else if (!trebleLane.enabled) {
+          feedback.textContent += ' | Treble clef stopped!';
+        }
+      } else if (monoLane && !monoLane.enabled) {
+        // Regular mode: game over if mono lane is disabled
         gameOver();
-      } else if (!bassClefActive) {
-        feedback.textContent += ' | Bass clef stopped!';
-      } else if (!trebleClefActive) {
-        feedback.textContent += ' | Treble clef stopped!';
       }
-    } else if (lives <= 0) {
-      gameOver();
+    } else {
+      // Fallback to old logic if piano-core not available
+      if (lives <= 0) {
+        gameOver();
+      }
     }
   }
   
