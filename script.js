@@ -778,7 +778,11 @@ function drawStaffGreenLine(collisionX, staff, lengthFluctuation) {
 
 // Update life icons display based on current lives
 function updateLifeDisplay() {
-  if (pianoModeActive && currentClef === 'grand') {
+  // Use piano-core engine to determine if we're in piano mode
+  const isPianoMode = typeof pianoCore !== 'undefined' && 
+    pianoCore.lane && pianoCore.lane('bass').enabled && pianoCore.lane('treble').enabled;
+  
+  if (isPianoMode) {
     // Piano Mode: show separate lives for bass and treble
     const regularLivesContainer = document.getElementById('lives-container');
     const pianoLivesContainer = document.getElementById('piano-lives-container');
@@ -786,11 +790,15 @@ function updateLifeDisplay() {
     if (regularLivesContainer) regularLivesContainer.style.display = 'none';
     if (pianoLivesContainer) pianoLivesContainer.style.display = 'flex';
     
+    // Get current lives from piano-core engine
+    const bassLaneState = pianoCore.lane('bass');
+    const trebleLaneState = pianoCore.lane('treble');
+    
     // Update bass clef lives
     for (let i = 1; i <= 3; i++) {
       const lifeElement = document.getElementById(`bassLife${i}`);
       if (lifeElement) {
-        if (i <= bassLives && bassClefActive) {
+        if (i <= bassLaneState.lives && bassLaneState.enabled) {
           lifeElement.className = 'life-icon';
         } else {
           lifeElement.className = 'life-icon lost';
@@ -802,7 +810,7 @@ function updateLifeDisplay() {
     for (let i = 1; i <= 3; i++) {
       const lifeElement = document.getElementById(`trebleLife${i}`);
       if (lifeElement) {
-        if (i <= trebleLives && trebleClefActive) {
+        if (i <= trebleLaneState.lives && trebleLaneState.enabled) {
           lifeElement.className = 'life-icon';
         } else {
           lifeElement.className = 'life-icon lost';
@@ -817,10 +825,19 @@ function updateLifeDisplay() {
     if (regularLivesContainer) regularLivesContainer.style.display = 'flex';
     if (pianoLivesContainer) pianoLivesContainer.style.display = 'none';
     
+    // Get lives from piano-core mono lane or fallback to global variable
+    let currentLives = lives; // fallback
+    if (typeof pianoCore !== 'undefined' && pianoCore.lane) {
+      const monoLane = pianoCore.lane('mono');
+      if (monoLane) {
+        currentLives = monoLane.lives;
+      }
+    }
+    
     for (let i = 1; i <= 3; i++) {
       const lifeElement = document.getElementById(`life${i}`);
       if (lifeElement) {
-        if (i <= lives) {
+        if (i <= currentLives) {
           // Life is still active
           lifeElement.className = 'life-icon';
         } else {
@@ -884,6 +901,10 @@ let spaceship = {
 // Game settings
 let lastNoteSpawn = 0;
 let noteSpawnRate = 2200; // Initial spawn rate for level 1
+
+// Piano-core based spawning system variables
+let lastMelodyMidiForLane = {}; // Track last midi note per lane for phrase-like generation
+let laneSpawnTimers = {}; // Track spawn timers per lane
 
 // Draw staff and clef using enhanced canvas-based musical notation
 function drawStaff(clef) {
@@ -1297,156 +1318,239 @@ function canSpawnNote(minDistance = 100) {
   return distance >= minDistance;
 }
 
-// Spawn moving note only (no meteors) - continuous spawning
-function spawnNote() {
-  const now = Date.now();
+// Piano-core based spawning system
+
+// Initialize spawning system with piano-core
+function initializeSpawning() {
+  // Clear existing timers
+  Object.values(laneSpawnTimers).forEach(timer => clearTimeout(timer));
+  laneSpawnTimers = {};
   
-  // Check what type of note will be spawned to adjust timing
-  const isChordSpawn = pianoModeActive && 
-    (pianoModeSettings.leftHand === 'chords' || pianoModeSettings.rightHand === 'chords');
+  // Initialize melody tracking
+  lastMelodyMidiForLane = {
+    bass: 47,   // G2 - comfortable bass starting point
+    treble: 72, // C5 - comfortable treble starting point  
+    mono: 60    // C4 - middle C starting point
+  };
   
-  // Piano Mode speed adjustment with different rates for chords vs melody
-  let effectiveSpawnRate = noteSpawnRate;
-  if (pianoModeActive) {
-    // Check if both hands are in melody mode for special displacement handling
-    const bothHandsMelody = (pianoModeSettings.leftHand !== 'none' && pianoModeSettings.leftHand !== 'chords') &&
-                           (pianoModeSettings.rightHand !== 'none' && pianoModeSettings.rightHand !== 'chords');
-    
-    if (isChordSpawn) {
-      // Chords come at same speed as normal mode
-      effectiveSpawnRate = Math.floor(noteSpawnRate * 1.0); // Same speed as normal mode
-    } else if (bothHandsMelody) {
-      // Different speeds for each hand when both are melody, but closer spacing allowed
-      const leftHandSpawnRate = Math.floor(noteSpawnRate * 0.9); // Left hand 10% faster
-      const rightHandSpawnRate = Math.floor(noteSpawnRate * 1.0); // Right hand normal speed
-      // Use alternating spawn rates to create displacement
-      effectiveSpawnRate = (now % 2 === 0) ? leftHandSpawnRate : rightHandSpawnRate;
-    } else {
-      // Melody comes at normal speed
-      effectiveSpawnRate = Math.floor(noteSpawnRate * 1.0); // Same speed as normal mode
-    }
+  // Start spawning for enabled lanes
+  if (typeof pianoCore !== 'undefined') {
+    scheduleSpawns();
+  }
+}
+
+// Generate melody note for a specific lane
+function spawnMelodyFor(lane) {
+  if (typeof pianoCore === 'undefined') return;
+  
+  const ls = pianoCore.lane(lane);
+  if (!ls || !ls.enabled) return;
+  
+  const prev = lastMelodyMidiForLane[lane] ?? (lane === 'bass' ? 47 : 72);
+  const stepChoices = [-2, -1, -1, 1, 1, 2, 2, 3, -3]; // phrase-like steps
+  const step = stepChoices[Math.floor(Math.random() * stepChoices.length)];
+  const next = Math.max(ls.range.min, Math.min(ls.range.max, prev + step));
+  
+  lastMelodyMidiForLane[lane] = next;
+  
+  const target = { 
+    kind: 'melody', 
+    midi: next, 
+    id: `M_${lane}_${Date.now()}` 
+  };
+  
+  pianoCore.pushTarget(lane, target);
+  
+  // Add to visual notes for rendering
+  addVisualNoteFromTarget(lane, target);
+}
+
+// Generate chord for a specific lane
+function spawnChordFor(lane) {
+  if (typeof pianoCore === 'undefined') return;
+  
+  const ls = pianoCore.lane(lane);
+  if (!ls || !ls.enabled) return;
+  
+  // Generate chord root within lane range
+  const roots = [];
+  for (let m = ls.range.min; m <= ls.range.max; m += 2) {
+    roots.push(m);
   }
   
-  if (now - lastNoteSpawn > effectiveSpawnRate) {
-    // Check if there's enough space to spawn a new note without overlap
-    // Use consistent 120px spacing for non-piano mode, flexible spacing for piano mode
-    const minDistance = pianoModeActive ? 80 : 120; // Tighter spacing for piano mode
-    if (!canSpawnNote(minDistance)) {
-      return; // Don't spawn if there would be overlap
-    }
-    
-    const noteData = pickRandomNote(); // Now returns note object directly or array for chords
-    
-    // Speed increases more gradually from level 3 onward
-    let baseSpeed;
-    if (level === 1) {
-      baseSpeed = 0.8; // Starting speed
-    } else if (level === 2) {
-      baseSpeed = 1.4; // 75% faster than level 1
-    } else if (level === 3) {
-      baseSpeed = 1.8; // More gradual increase from level 2
-    } else if (level === 4) {
-      baseSpeed = 2.2; // Gradual increase
-    } else {
-      // Slightly increased progression for higher levels (improved acceleration after level 3)
-      baseSpeed = 2.2 + (level - 4) * 0.4; // Each level adds 0.4 speed (increased from 0.3)
-    }
-    
-    // Piano Mode speed adjustment for note movement
-    if (pianoModeActive) {
-      // Check if both hands are in melody mode for different speed handling  
-      const bothHandsMelody = (pianoModeSettings.leftHand !== 'none' && pianoModeSettings.leftHand !== 'chords') &&
-                             (pianoModeSettings.rightHand !== 'none' && pianoModeSettings.rightHand !== 'chords');
-      
-      if (Array.isArray(noteData)) {
-        // Chords move slower
-        baseSpeed = baseSpeed * 0.7; // 30% slower movement for chords
-      } else if (bothHandsMelody) {
-        // Different speeds for each hand when both are melody
-        if (noteData.clef === 'bass') {
-          baseSpeed = baseSpeed * 0.95; // Left hand (bass) slightly faster
-        } else if (noteData.clef === 'treble') {
-          baseSpeed = baseSpeed * 0.85; // Right hand (treble) slower
-        } else {
-          baseSpeed = baseSpeed * 0.9; // Default melody speed
-        }
-      } else {
-        // Melody moves at normal Piano Mode speed
-        baseSpeed = baseSpeed * 0.9; // 10% slower movement for melody
-      }
-    }
-    
-    // Handle chord mode (multiple notes)
-    if (Array.isArray(noteData)) {
-      // Spawn chord (multiple notes at once)
-      const baseX = canvas.width + 20;
-      const chordId = Date.now();
-      
-      noteData.forEach((singleNote, index) => {
-        // Calculate displacement for adjacent notes (one staff position apart)
-        let xOffset = 0;
-        if (index > 0) {
-          const prevNote = noteData[index - 1];
-          const staffDiff = Math.abs(singleNote.staffLocalIndex - prevNote.staffLocalIndex);
-          if (staffDiff === 1) {
-            // Adjacent notes get displaced slightly
-            xOffset = (index % 2 === 0) ? -8 : 8; // Alternate left/right displacement
-          }
-        }
-        
-        const movingNote = {
-          x: baseX + xOffset, // Stack vertically with displacement for adjacent notes
-          staffLocalIndex: singleNote.staffLocalIndex,
-          note: singleNote.note,
-          letter: singleNote.letter,
-          octave: singleNote.octave,
-          midi: singleNote.midi,
-          scientific: singleNote.scientific,
-          clef: singleNote.clef || currentClef,
-          speed: baseSpeed,
-          id: Date.now() + index,
-          isChord: true,
-          chordId: chordId, // Same chord ID for all notes in the chord
-          // Keep legacy line property for compatibility during transition
-          line: singleNote.line || singleNote.staffLocalIndex
-        };
-        movingNotes.push(movingNote);
-      });
-    } else {
-      // Create single moving note
+  if (roots.length === 0) return;
+  
+  const root = roots[Math.floor(Math.random() * roots.length)];
+  
+  // Build triad: root, third, fifth
+  const tones = [root, root + 4, root + 7].filter(n => 
+    n >= ls.range.min && n <= ls.range.max
+  );
+  
+  if (tones.length < 2) return; // Need at least 2 notes for a chord
+  
+  const target = { 
+    kind: 'chord', 
+    mids: Array.from(new Set(tones)), 
+    id: `C_${lane}_${Date.now()}` 
+  };
+  
+  pianoCore.pushTarget(lane, target);
+  
+  // Add to visual notes for rendering
+  addVisualNoteFromTarget(lane, target);
+}
+
+// Convert piano-core target to visual note for rendering
+function addVisualNoteFromTarget(lane, target) {
+  const baseSpeed = 220 / 60; // Convert px/sec to px/frame (assuming 60fps)
+  const baseX = canvas.width + 20;
+  
+  if (target.kind === 'melody') {
+    // Convert MIDI to visual note data
+    const noteData = midiToVisualNote(target.midi, lane);
+    if (noteData) {
       const movingNote = {
-        x: canvas.width + 20, // Start from right side
+        x: baseX,
         staffLocalIndex: noteData.staffLocalIndex,
         note: noteData.note,
         letter: noteData.letter,
         octave: noteData.octave,
         midi: noteData.midi,
         scientific: noteData.scientific,
-        clef: noteData.clef || currentClef,
+        clef: noteData.clef,
         speed: baseSpeed,
-        id: Date.now(),
-        // Keep legacy line property for compatibility during transition
-        line: noteData.line || noteData.staffLocalIndex
+        id: target.id,
+        isChord: false,
+        pianoCoreTarget: target // Link back to piano-core target
       };
-      
       movingNotes.push(movingNote);
     }
+  } else if (target.kind === 'chord') {
+    // Create visual notes for each chord tone
+    target.mids.forEach((midi, index) => {
+      const noteData = midiToVisualNote(midi, lane);
+      if (noteData) {
+        let xOffset = 0;
+        if (index > 0) {
+          // Slight horizontal displacement for chord notes
+          xOffset = (index % 2 === 0) ? -8 : 8;
+        }
+        
+        const movingNote = {
+          x: baseX + xOffset,
+          staffLocalIndex: noteData.staffLocalIndex,
+          note: noteData.note,
+          letter: noteData.letter,
+          octave: noteData.octave,
+          midi: noteData.midi,
+          scientific: noteData.scientific,
+          clef: noteData.clef,
+          speed: baseSpeed,
+          id: target.id + '_' + index,
+          isChord: true,
+          chordId: target.id,
+          pianoCoreTarget: target // Link back to piano-core target
+        };
+        movingNotes.push(movingNote);
+      }
+    });
+  }
+}
+
+// Convert MIDI number to visual note data
+function midiToVisualNote(midi, lane) {
+  // Determine clef based on lane and piano mode
+  let clef = 'treble';
+  if (lane === 'bass') clef = 'bass';
+  else if (lane === 'mono') clef = currentClef;
+  
+  // Convert MIDI to note data (simplified version)
+  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const octave = Math.floor(midi / 12) - 1;
+  const noteIndex = midi % 12;
+  const noteName = noteNames[noteIndex];
+  
+  // Skip sharps/flats for now - use natural notes only
+  if (noteName.includes('#')) return null;
+  
+  const letter = noteName[0];
+  const scientific = letter + octave;
+  
+  // Calculate staff position (simplified)
+  const staffLocalIndex = calculateStaffPosition(midi, clef);
+  
+  return {
+    staffLocalIndex,
+    note: noteName,
+    letter,
+    octave,
+    midi,
+    scientific,
+    clef
+  };
+}
+
+// Calculate staff position for a MIDI note
+function calculateStaffPosition(midi, clef) {
+  // This is a simplified version - would need the full notePositions mapping
+  if (clef === 'bass') {
+    // Bass clef: middle line (staff index 4) is D3 (midi 38)
+    const d3Midi = 38;
+    const semitoneOffset = midi - d3Midi;
+    // Convert semitones to staff positions (approximate)
+    return 4 - Math.round(semitoneOffset / 2);
+  } else {
+    // Treble clef: middle line (staff index 4) is B4 (midi 71)  
+    const b4Midi = 71;
+    const semitoneOffset = midi - b4Midi;
+    return 4 - Math.round(semitoneOffset / 2);
+  }
+}
+
+// Schedule spawning for all enabled lanes
+function scheduleSpawns() {
+  if (typeof pianoCore === 'undefined') return;
+  
+  const lvl = level || 1;
+  
+  ['bass', 'treble', 'mono'].forEach((lane) => {
+    const ls = pianoCore.lane(lane);
+    if (!ls || !ls.enabled) return;
     
-    lastNoteSpawn = now;
-    
-    // Spawn rate also increases gradually with level
-    if (level === 1) {
-      noteSpawnRate = 2200; // Starting spawn rate
-    } else if (level === 2) {
-      noteSpawnRate = 1600; // Faster spawning
-    } else if (level === 3) {
-      noteSpawnRate = 1400; // More gradual increase
-    } else if (level === 4) {
-      noteSpawnRate = 1200; // Gradual increase
-    } else {
-      // More gradual spawn rate increase for higher levels
-      noteSpawnRate = Math.max(800, 1200 - (level - 4) * 50); // Each level reduces spawn time by only 50ms
+    // Clear existing timer for this lane
+    if (laneSpawnTimers[lane]) {
+      clearTimeout(laneSpawnTimers[lane]);
     }
+    
+    const interval = (ls.mode === 'chord') 
+      ? ls.spawnIntervalChordMs(lvl)
+      : ls.spawnIntervalMs(lvl);
+    
+    laneSpawnTimers[lane] = setTimeout(() => {
+      if (!ls.enabled) return;
+      
+      if (ls.mode === 'chord') {
+        spawnChordFor(lane);
+      } else {
+        spawnMelodyFor(lane);
+      }
+      
+      // Schedule next spawn
+      scheduleSpawns();
+    }, interval);
+  });
+}
+
+// Spawn moving note only (no meteors) - continuous spawning
+function spawnNote() {
+  // Legacy function - now spawning is handled by piano-core engine
+  // via scheduleSpawns() which is called from initializeSpawning()
+  // This function is kept for compatibility with existing game loop
+  
+  // Just ensure the new spawning system is running if not already
+  if (typeof pianoCore !== 'undefined' && Object.keys(laneSpawnTimers).length === 0) {
+    initializeSpawning();
   }
 }
 
@@ -1585,18 +1689,34 @@ function updateMovingNotes() {
       // Spawn a replacement note to maintain 10 notes per level
       respawnNote();
       
-      // Check game over condition
-      if (pianoModeActive && currentClef === 'grand') {
-        // Piano Mode: game over only if both clefs are inactive
-        if (!bassClefActive && !trebleClefActive) {
+      // Check game over condition using piano-core engine state
+      if (typeof pianoCore !== 'undefined' && pianoCore.lane) {
+        const bassLane = pianoCore.lane('bass');
+        const trebleLane = pianoCore.lane('treble');
+        const monoLane = pianoCore.lane('mono');
+        
+        // Check if we're in piano mode (both bass and treble lanes exist and were initially enabled)
+        const wasPianoMode = bassLane && trebleLane && (bassLane.lives > 0 || trebleLane.lives > 0 || 
+          !bassLane.enabled || !trebleLane.enabled); // At least one lane was active or got disabled
+        
+        if (wasPianoMode) {
+          // Piano Mode: game over only if both bass and treble lanes are disabled
+          if (!bassLane.enabled && !trebleLane.enabled) {
+            gameOver();
+          } else if (!bassLane.enabled) {
+            feedback.textContent += ' | Bass clef stopped!';
+          } else if (!trebleLane.enabled) {
+            feedback.textContent += ' | Treble clef stopped!';
+          }
+        } else if (monoLane && !monoLane.enabled) {
+          // Regular mode: game over if mono lane is disabled
           gameOver();
-        } else if (!bassClefActive) {
-          feedback.textContent += ' | Bass clef stopped!';
-        } else if (!trebleClefActive) {
-          feedback.textContent += ' | Treble clef stopped!';
         }
-      } else if (lives <= 0) {
-        gameOver();
+      } else {
+        // Fallback to old logic if piano-core not available
+        if (lives <= 0) {
+          gameOver();
+        }
       }
     }
     
@@ -1723,6 +1843,121 @@ async function restartGame() {
   leftHandScore = 0;
   rightHandScore = 0;
   
+  // Initialize piano-core engine
+  if (typeof pianoCore !== 'undefined') {
+    const pianoOn = !!gameSettings?.pianoMode?.enabled;
+    pianoCore.init({
+      pianoModeActive: pianoOn,
+      level: level,
+      bassLives: bassLives,
+      trebleLives: trebleLives,
+      monoLives: lives,
+      modes: {
+        // For now using default modes - can be configured from menu later
+        bass: 'chord',
+        treble: 'melody', 
+        mono: 'melody'
+      }
+    });
+
+    // Wire UI callbacks
+    pianoCore.configureCallbacks({
+      onLives(lane, livesCount) {
+        // Update the appropriate lives counter based on lane
+        if (lane === 'bass') {
+          bassLives = livesCount;
+          bassClefActive = livesCount > 0;
+        } else if (lane === 'treble') {
+          trebleLives = livesCount;
+          trebleClefActive = livesCount > 0;
+        } else { // mono
+          lives = livesCount;
+        }
+        updateLifeDisplay();
+      },
+      onSuccess(lane, target) {
+        // Handle successful target hit - integrate with existing scoring system
+        console.log(`Success in ${lane} lane:`, target);
+        
+        // Update score and stats like the existing system
+        score += 10; // Base score
+        notesDestroyed++;
+        correctAnswers++;
+        
+        // Update hand-specific scoring for piano mode
+        if (lane === 'bass') {
+          leftHandScore += 10;
+        } else if (lane === 'treble') {
+          rightHandScore += 10;
+        }
+        
+        // Update display elements
+        if (scoreDisplay) scoreDisplay.textContent = `Score: ${score}`;
+        if (notesDestroyedDisplay) notesDestroyedDisplay.textContent = `Notes Destroyed: ${notesDestroyed}`;
+        
+        // Level progression logic
+        if (correctAnswers >= 10) {
+          level++;
+          correctAnswers = 0;
+          if (feedback) {
+            feedback.textContent = `Level ${level}!`;
+            feedback.style.color = '#4CAF50';
+          }
+        }
+      },
+      onFail(lane, target, why) {
+        // Handle failed target - integrate with existing feedback
+        console.log(`Fail in ${lane} lane:`, target, 'Reason:', why);
+        
+        // Provide user feedback about the failure
+        if (feedback) {
+          let message = 'Wrong!';
+          if (why === 'melody-wrong-note') {
+            message = 'Wrong note!';
+          } else if (why === 'chord-stray') {
+            message = 'Wrong chord note!';
+          } else if (why === 'chord-timeout') {
+            message = 'Chord too slow!';
+          }
+          
+          feedback.textContent = message;
+          feedback.style.color = '#d0021b';
+          feedback.style.fontSize = '16px';
+        }
+        
+        // Trigger visual effects (explosion, flash, etc.)
+        triggerShake(3, 200); // Light shake for wrong input
+        
+        // Flash effect
+        flashEffect.active = true;
+        flashEffect.startTime = Date.now();
+        
+        playSound('explosionLoseLive');
+      },
+      onLaneDisabled(lane) {
+        console.log(`Lane ${lane} disabled`);
+        
+        // Update feedback to inform user
+        if (feedback) {
+          if (lane === 'bass') {
+            feedback.textContent += ' | Bass clef stopped!';
+          } else if (lane === 'treble') {
+            feedback.textContent += ' | Treble clef stopped!';
+          } else {
+            feedback.textContent = 'No more lives!';
+          }
+        }
+      },
+      onGameOver(reason) {
+        console.log(`Game over: ${reason}`);
+        // Trigger the existing game over logic
+        if (typeof gameOver === 'function') {
+          gameOver();
+        }
+      }
+    });
+  }
+  
   // Hide Piano Mode controls during gameplay
   const pianoModeControls = document.getElementById('pianoModeControls');
   if (pianoModeControls) {
@@ -1739,6 +1974,11 @@ async function restartGame() {
   lastNoteSpawn = 0;
   noteSpawnRate = 2200; // Reset to level 1 spawn rate
   flashEffect.active = false;
+  
+  // Initialize piano-core based spawning
+  if (typeof pianoCore !== 'undefined') {
+    initializeSpawning();
+  }
   
   // Reset spaceship rotation
   spaceship.rotation = 0;
@@ -2722,18 +2962,34 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
     
     // Don't immediately spawn a new note - let the current one finish flashing
     
-    // Check game over condition
-    if (pianoModeActive && currentClef === 'grand') {
-      // Piano Mode: game over only if both clefs are inactive
-      if (!bassClefActive && !trebleClefActive) {
+    // Check game over condition using piano-core engine state
+    if (typeof pianoCore !== 'undefined' && pianoCore.lane) {
+      const bassLane = pianoCore.lane('bass');
+      const trebleLane = pianoCore.lane('treble');
+      const monoLane = pianoCore.lane('mono');
+      
+      // Check if we're in piano mode (both bass and treble lanes exist and were initially enabled)
+      const wasPianoMode = bassLane && trebleLane && (bassLane.lives > 0 || trebleLane.lives > 0 || 
+        !bassLane.enabled || !trebleLane.enabled); // At least one lane was active or got disabled
+      
+      if (wasPianoMode) {
+        // Piano Mode: game over only if both bass and treble lanes are disabled
+        if (!bassLane.enabled && !trebleLane.enabled) {
+          gameOver();
+        } else if (!bassLane.enabled) {
+          feedback.textContent += ' | Bass clef stopped!';
+        } else if (!trebleLane.enabled) {
+          feedback.textContent += ' | Treble clef stopped!';
+        }
+      } else if (monoLane && !monoLane.enabled) {
+        // Regular mode: game over if mono lane is disabled
         gameOver();
-      } else if (!bassClefActive) {
-        feedback.textContent += ' | Bass clef stopped!';
-      } else if (!trebleClefActive) {
-        feedback.textContent += ' | Treble clef stopped!';
       }
-    } else if (lives <= 0) {
-      gameOver();
+    } else {
+      // Fallback to old logic if piano-core not available
+      if (lives <= 0) {
+        gameOver();
+      }
     }
   }
   
