@@ -1231,15 +1231,33 @@ function drawExplosions() {
 
 // Check if there's enough space to spawn a new note without overlap
 function canSpawnNote(minDistance = 100) {
+  // For normal mode (not piano mode), only allow one note at a time
+  if (!pianoModeActive && movingNotes.length > 0) {
+    return false;
+  }
+  
   if (movingNotes.length === 0) return true;
   
+  // Piano mode logic (existing behavior)
   // Find the rightmost note
   const rightmostNote = movingNotes.reduce((rightmost, note) => {
     return note.x > rightmost.x ? note : rightmost;
   }, movingNotes[0]);
   
+  // Calculate spawn position at right edge of stave (matches spawnNote function logic)
+  let spawnX = canvas.width + 20; // Default fallback
+  if (currentClef === 'grand') {
+    // For grand staff, use treble stave as reference
+    if (currentTrebleStave) {
+      spawnX = currentTrebleStave.x + currentTrebleStave.width; // Right edge of stave
+    }
+  } else if (currentClef === 'treble' && currentTrebleStave) {
+    spawnX = currentTrebleStave.x + currentTrebleStave.width; // Right edge of treble stave
+  } else if (currentClef === 'bass' && currentBassStave) {
+    spawnX = currentBassStave.x + currentBassStave.width; // Right edge of bass stave
+  }
+  
   // Check if there's enough distance from the rightmost note to the spawn point
-  const spawnX = canvas.width + 20;
   const distance = spawnX - rightmostNote.x;
   
   // Always allow spawning if there are fewer than 3 notes on screen to ensure gameplay continues
@@ -1332,7 +1350,19 @@ function spawnNote() {
     // Handle chord mode (multiple notes)
     if (Array.isArray(noteData)) {
       // Spawn chord (multiple notes at once)
-      const baseX = canvas.width + 20;
+      // Calculate spawn position at right edge of stave
+      let spawnX = canvas.width + 20; // Default fallback
+      if (currentClef === 'grand') {
+        // For grand staff, use treble stave position (notes will be filtered by clef anyway)
+        if (currentTrebleStave) {
+          spawnX = currentTrebleStave.x + currentTrebleStave.width; // Right edge of stave
+        }
+      } else if (currentClef === 'treble' && currentTrebleStave) {
+        spawnX = currentTrebleStave.x + currentTrebleStave.width; // Right edge of treble stave
+      } else if (currentClef === 'bass' && currentBassStave) {
+        spawnX = currentBassStave.x + currentBassStave.width; // Right edge of bass stave
+      }
+      const baseX = spawnX;
       const chordId = Date.now();
       
       noteData.forEach((singleNote, index) => {
@@ -1367,8 +1397,23 @@ function spawnNote() {
       });
     } else {
       // Create single moving note
+      // Calculate spawn position at right edge of stave
+      let spawnX = canvas.width + 20; // Default fallback
+      if (currentClef === 'grand') {
+        // For grand staff, determine spawn position based on note's clef
+        if (noteData.clef === 'treble' && currentTrebleStave) {
+          spawnX = currentTrebleStave.x + currentTrebleStave.width; // Right edge of treble stave
+        } else if (noteData.clef === 'bass' && currentBassStave) {
+          spawnX = currentBassStave.x + currentBassStave.width; // Right edge of bass stave
+        }
+      } else if (currentClef === 'treble' && currentTrebleStave) {
+        spawnX = currentTrebleStave.x + currentTrebleStave.width; // Right edge of treble stave
+      } else if (currentClef === 'bass' && currentBassStave) {
+        spawnX = currentBassStave.x + currentBassStave.width; // Right edge of bass stave
+      }
+      
       const movingNote = {
-        x: canvas.width + 20, // Start from right side
+        x: spawnX, // Start from right edge of clef
         staffLocalIndex: noteData.staffLocalIndex,
         note: noteData.note,
         letter: noteData.letter,
@@ -1401,6 +1446,15 @@ function spawnNote() {
       noteSpawnRate = Math.max(800, 1200 - (level - 4) * 50); // Each level reduces spawn time by only 50ms
     }
   }
+}
+
+// Force spawn a new note immediately (for single-note flow)
+function forceSpawnNote() {
+  // Reset spawn timing to allow immediate spawn
+  lastNoteSpawn = 0;
+  
+  // Spawn the note immediately
+  spawnNote();
 }
 
 // Spawn a replacement note when one is destroyed (wrong answer or collision)
@@ -1520,8 +1574,8 @@ function updateMovingNotes() {
       feedback.style.color = '#d0021b';
       feedback.style.fontSize = '16px';
       
-      // Spawn a replacement note to maintain 10 notes per level
-      respawnNote();
+      // Spawn next note immediately for single-note flow
+      forceSpawnNote();
       
       if (lives <= 0) {
         gameOver();
@@ -1954,11 +2008,11 @@ async function initializeGame() {
 // Main game loop
 function gameLoop() {
   if (gameRunning) {
+    drawStaff(currentClef); // Draw staff first to ensure stave objects exist
     spawnNote(); // Changed from spawnNoteAndMeteor
     updateMovingNotes();
     updateSpaceship();
     updateExplosions();
-    drawStaff(currentClef);
     
     // FIXED: Remove throttled cleanup from game loop - now runs immediately on MIDI input
     // Chord cleanup is now handled directly in handleNoteInputWithOctave for responsive input
@@ -2189,6 +2243,9 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
         // Clean up chord progress tracking
         chordProgress.delete(chordId);
         
+        // Spawn next note immediately for single-note flow
+        forceSpawnNote();
+        
         feedback.textContent = `Chord Complete! +1 point!`;
         feedback.style.color = '#00ff00';
         feedback.style.fontSize = '16px';
@@ -2276,6 +2333,9 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
       
       // Remove the single note
       movingNotes.splice(matchedIndex, 1);
+      
+      // Spawn next note immediately for single-note flow
+      forceSpawnNote();
       
       feedback.textContent = `Correct! The note was ${matchedNote.note}`;
       feedback.style.color = '#00ff00';
@@ -2373,12 +2433,11 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
     
   } else {
     // Wrong answer - no matching note found
-    // For piano mode chord mode, find the leftmost chord to destroy
-    let leftmostChordToDestroy = null;
-    let leftmostChordIndex = -1;
-    let minChordDistance = Infinity;
+    // Find the leftmost note to destroy (regardless of whether it matches user input)
+    let leftmostNoteToDestroy = null;
+    let minNoteDistance = Infinity;
     
-    // Find the leftmost chord respecting hand boundaries in piano mode
+    // Find the leftmost note respecting hand boundaries in piano mode
     movingNotes.forEach((note, index) => {
       // In piano mode, check if this note belongs to an active hand
       if (pianoModeActive && currentClef === 'grand') {
@@ -2393,53 +2452,21 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
         if (!noteIsFromActiveHand) {
           return; // Skip notes from inactive hands
         }
-        
-        // For piano mode with chord modes, check if this is a chord in an active chord mode
-        if ((note.clef === 'bass' && pianoModeSettings.leftHand === 'chords') ||
-            (note.clef === 'treble' && pianoModeSettings.rightHand === 'chords')) {
-          if (note.isChord && note.x < minChordDistance) {
-            minChordDistance = note.x;
-            leftmostChordToDestroy = note;
-            leftmostChordIndex = index;
-          }
-        }
-      } else {
-        // Regular mode - find leftmost chord
-        if (note.isChord && note.x < minChordDistance) {
-          minChordDistance = note.x;
-          leftmostChordToDestroy = note;
-          leftmostChordIndex = index;
-        }
+      }
+      
+      // Find the leftmost note regardless of type (chord or single)
+      if (note.x < minNoteDistance) {
+        minNoteDistance = note.x;
+        leftmostNoteToDestroy = note;
       }
     });
     
-    // If we found a chord to destroy, destroy it
-    if (leftmostChordToDestroy && leftmostChordToDestroy.isChord) {
-      const chordId = leftmostChordToDestroy.chordId;
-      const affectedClef = leftmostChordToDestroy.clef;
-      
-      // Remove all notes in this chord
-      for (let i = movingNotes.length - 1; i >= 0; i--) {
-        if (movingNotes[i].isChord && movingNotes[i].chordId === chordId) {
-          movingNotes.splice(i, 1);
-        }
-      }
-      
-      // Reset chord progress for this chord
-      chordProgress.delete(chordId);
-      
-      // Spawn replacement chord for the affected hand/clef
-      respawnNote();
-      
-      feedback.textContent = `Wrong note! Chord deleted for ${affectedClef} clef.`;
-      feedback.style.color = '#d0021b';
-      feedback.style.fontSize = '16px';
-    } else if (leftmostNote) {
-      // Fall back to original logic for single notes
-      if (leftmostNote.isChord) {
-        // For chords: instantly delete the entire chord for the affected hand/clef and reset progress
-        const chordId = leftmostNote.chordId;
-        const affectedClef = leftmostNote.clef;
+    // Destroy the leftmost note if found
+    if (leftmostNoteToDestroy) {
+      if (leftmostNoteToDestroy.isChord) {
+        // For chords: destroy the entire chord
+        const chordId = leftmostNoteToDestroy.chordId;
+        const affectedClef = leftmostNoteToDestroy.clef;
         
         // Remove all notes in this chord
         for (let i = movingNotes.length - 1; i >= 0; i--) {
@@ -2451,33 +2478,23 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
         // Reset chord progress for this chord
         chordProgress.delete(chordId);
         
-        // Spawn replacement chord for the affected hand/clef
-        respawnNote();
-        
         feedback.textContent = `Wrong note! Chord deleted for ${affectedClef} clef.`;
         feedback.style.color = '#d0021b';
         feedback.style.fontSize = '16px';
       } else {
-        // Single note - use existing behavior with flashing
-        leftmostNote.flashing = true;
-        leftmostNote.flashStartTime = Date.now();
-        leftmostNote.flashCount = 0;
+        // Single note - destroy immediately
+        const noteIndex = movingNotes.indexOf(leftmostNoteToDestroy);
+        if (noteIndex !== -1) {
+          movingNotes.splice(noteIndex, 1);
+        }
         
-        // Remove the note after the flashing is done
-        setTimeout(() => {
-          const noteIndex = movingNotes.indexOf(leftmostNote);
-          if (noteIndex !== -1) {
-            movingNotes.splice(noteIndex, 1);
-            
-            // Spawn a replacement note to maintain gameplay flow
-            respawnNote();
-          }
-        }, 600); // 600ms total for two flashes (300ms each)
-        
-        feedback.textContent = ''; // Remove feedback about what the note should have been
+        feedback.textContent = `Wrong note! Note deleted. The note was ${leftmostNoteToDestroy.note}`;
         feedback.style.color = '#d0021b';
         feedback.style.fontSize = '16px';
       }
+      
+      // Spawn next note immediately after destruction
+      forceSpawnNote();
     }
     
     lives--;
