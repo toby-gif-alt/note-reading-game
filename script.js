@@ -215,6 +215,12 @@ function buildNoteDefinitions() {
     ...definitions.bass.map(note => ({ ...note, clef: 'bass' }))
   ];
   
+  // Hard Mode: same as grand staff (independent treble and bass clefs)
+  definitions.hardMode = [
+    ...definitions.treble.map(note => ({ ...note, clef: 'treble' })),
+    ...definitions.bass.map(note => ({ ...note, clef: 'bass' }))
+  ];
+  
   return definitions;
 }
 
@@ -242,7 +248,7 @@ const ctx = canvas.getContext('2d');
 function updateSpaceshipPosition() {
   // Position spaceship with adequate clearance from bottom controls and stave
   // Increased clearance to prevent overlap with pitch buttons or staff
-  if (currentClef === 'grand') {
+  if (isDualClefMode()) {
     spaceship.y = canvas.height - 320; // Increased spacing for grand stave (was 280)
   } else {
     spaceship.y = canvas.height - 380; // Increased spacing for single staves (was 350)
@@ -277,6 +283,11 @@ let gameSettings = {
 // Piano Mode integration
 let pianoModeActive = false;
 let pianoModeSettings = {};
+
+// Helper function to check if we're in dual-clef mode (grand staff or hard mode)
+function isDualClefMode() {
+  return currentClef === 'grand' || currentClef === 'hardMode';
+}
 
 // Chord completion tracking for Piano Mode with grace period
 let chordProgress = new Map(); // chordId -> { pressedNotes: Set, timestamps: Map, firstPressTime: number }
@@ -342,8 +353,13 @@ function loadGameSettings() {
     currentClef = settings.clef || 'treble';
     maxLedgerLines = settings.ledgerLines !== undefined ? settings.ledgerLines : 4;
     
+    // Validate hardMode clef: only allow hardMode if Piano Mode is active
+    if (currentClef === 'hardMode' && !gameSettings.pianoMode.active) {
+      currentClef = 'treble'; // Reset to default if hardMode without Piano Mode
+    }
+    
     // Load Piano Mode settings
-    pianoModeActive = gameSettings.pianoMode.enabled;
+    pianoModeActive = gameSettings.pianoMode.active;
     pianoModeSettings = { ...gameSettings.pianoMode };
     
     // Sync property mappings for Piano Mode settings from menu
@@ -369,13 +385,33 @@ function onPianoModeChanged(settings) {
   if (settings.forceGrandStaff !== undefined) {
     pianoModeSettings.forceGrandStaff = settings.forceGrandStaff;
   }
+  if (settings.hardMode !== undefined) {
+    pianoModeSettings.hardMode = settings.hardMode;
+  }
+  
+  console.log('onPianoModeChanged called with settings:', settings);
+  console.log('Updated game pianoModeSettings:', pianoModeSettings);
+  
+  // Do NOT call updateMidiPianoModeSettings from here to avoid circular dependency
+  // The MIDI integration will be updated directly by updateGamePianoModeSettings
   
   if (pianoModeActive) {
-    // Force grand staff if Piano Mode is active and setting is enabled
-    if (settings.forceGrandStaff && currentClef !== 'grand') {
+    if (pianoModeSettings.hardMode) {
+      // Hard Mode: Use independent treble and bass clefs instead of grand staff
+      currentClef = 'hardMode';
+      drawStaff(currentClef);
+      document.getElementById('clefDisplay').textContent = 'Clef selected: Bass & Treble (Hard Mode)';
+      // Show hard mode help text
+      const hardModeHelp = document.getElementById('hardModeHelp');
+      if (hardModeHelp) hardModeHelp.style.display = 'block';
+    } else if (settings.forceGrandStaff && currentClef !== 'grand') {
+      // Regular Piano Mode: Force grand staff if setting is enabled
       currentClef = 'grand';
       drawStaff(currentClef);
       document.getElementById('clefDisplay').textContent = 'Clef selected: Grand Stave (Piano Mode)';
+      // Hide hard mode help text
+      const hardModeHelp = document.getElementById('hardModeHelp');
+      if (hardModeHelp) hardModeHelp.style.display = 'none';
     }
   }
   
@@ -392,7 +428,12 @@ function updateGamePianoModeSettings(settings) {
     pianoModeSettings.strictMode = settings.strictMode;
   }
   
-  console.log('Piano mode settings updated:', pianoModeSettings);
+  console.log('Game Piano mode settings updated:', pianoModeSettings);
+  
+  // Also update the MIDI integration settings if available
+  if (typeof window.updateMidiPianoModeSettings === 'function') {
+    window.updateMidiPianoModeSettings(settings);
+  }
 }
 
 // Make functions available globally
@@ -894,8 +935,8 @@ function drawStaff(clef) {
   
 
   
-  if (clef === 'grand') {
-    // Draw grand staff (both treble and bass)
+  if (clef === 'grand' || clef === 'hardMode') {
+    // Draw grand staff (both treble and bass) or Hard Mode (independent clefs positioned like grand staff)
     // Increase spacing based on maxLedgerLines to prevent overlap
     const baseSpacing = 100;
     const extraSpacing = Math.max(0, (maxLedgerLines - 2) * 20); // Add space for additional ledger lines
@@ -1100,7 +1141,7 @@ function drawMovingNotes() {
     let staffInfo;
     let noteY;
     
-    if (currentClef === 'grand') {
+    if (isDualClefMode()) {
       if (note.clef === 'treble' && currentTrebleStave) {
         staffInfo = currentTrebleStave;
         noteY = getNoteY(note, staffInfo);
@@ -1241,7 +1282,22 @@ function drawExplosions() {
 
 // Check if there's enough space to spawn a new note without overlap
 function canSpawnNote(minDistance = 100) {
-  // For both normal mode and piano mode, only allow one note/chord at a time
+  // In hard mode, allow up to 2 notes (one per clef) for independent completion
+  if (pianoModeActive && pianoModeSettings.hardMode && currentClef === 'hardMode') {
+    const leftHandActive = pianoModeSettings.leftHand !== 'none';
+    const rightHandActive = pianoModeSettings.rightHand !== 'none';
+    
+    if (leftHandActive && rightHandActive) {
+      // Count notes per clef
+      const bassNotes = movingNotes.filter(note => note.clef === 'bass');
+      const trebleNotes = movingNotes.filter(note => note.clef === 'treble');
+      
+      // Allow one note per active clef
+      return bassNotes.length === 0 || trebleNotes.length === 0;
+    }
+  }
+  
+  // For normal modes, only allow one note/chord at a time
   if (movingNotes.length > 0) {
     return false;
   }
@@ -1264,6 +1320,11 @@ function spawnNote() {
     }
     
     const noteData = pickRandomNote(); // Now returns note object directly or array for chords
+    
+    // Handle case where no note should be spawned (e.g., hard mode with both clefs full)
+    if (!noteData) {
+      return; // Don't spawn if pickRandomNote returns null
+    }
     
     // Speed increases more gradually from level 3 onward
     let baseSpeed;
@@ -1288,7 +1349,7 @@ function spawnNote() {
       // Spawn chord (multiple notes at once)
       // Calculate spawn position at right edge of stave
       let spawnX = canvas.width + 20; // Default fallback
-      if (currentClef === 'grand') {
+      if (isDualClefMode()) {
         // For grand staff, use treble stave position (notes will be filtered by clef anyway)
         if (currentTrebleStave) {
           spawnX = currentTrebleStave.x + currentTrebleStave.width; // Right edge of stave
@@ -1335,7 +1396,7 @@ function spawnNote() {
       // Create single moving note
       // Calculate spawn position at right edge of stave
       let spawnX = canvas.width + 20; // Default fallback
-      if (currentClef === 'grand') {
+      if (isDualClefMode()) {
         // For grand staff, determine spawn position based on note's clef
         if (noteData.clef === 'treble' && currentTrebleStave) {
           spawnX = currentTrebleStave.x + currentTrebleStave.width; // Right edge of treble stave
@@ -1475,7 +1536,7 @@ function updateMovingNotes() {
     let staffClef, clefX, clefY, staffBottomY;
     
     // Get dynamic staff position based on current staff and note clef
-    if (currentClef === 'grand') {
+    if (isDualClefMode()) {
       if (note.clef === 'treble' && currentTrebleStave) {
         greenLineCollisionX = currentTrebleStave.clefX + 35; // Green line position
         staffClef = currentTrebleStave;
@@ -1582,7 +1643,7 @@ function gameOver() {
   
   // Minimal explosion effects instead of the heavy game over explosions
   // Just a few small explosions instead of 12 large ones
-  if (currentClef === 'grand') {
+  if (isDualClefMode()) {
     // For grand staff, create minimal explosions
     if (currentTrebleStave) {
       createMinimalExplosions(currentTrebleStave.clefX, currentTrebleStave.clefY);
@@ -1661,12 +1722,6 @@ async function restartGame() {
   leftHandScore = 0;
   rightHandScore = 0;
   
-  // Hide Piano Mode controls during gameplay
-  const pianoModeControls = document.getElementById('pianoModeControls');
-  if (pianoModeControls) {
-    pianoModeControls.style.display = 'none';
-  }
-  
   // Clear Piano Mode chord progress tracking to prevent input blocking
   chordProgress.clear();
   
@@ -1718,21 +1773,23 @@ function getNotesForPianoModeHand(hand, clef, availableNotes) {
   
   let handNotes = availableNotes.filter(note => note.clef === clef);
   
-  // Apply Piano Mode note range limits
-  if (clef === 'bass') {
-    // Bass clef: highest note should be B3
-    handNotes = handNotes.filter(note => {
-      const midi = note.midi || scientificToMidi(note.letter, note.octave);
-      const b3Midi = scientificToMidi('B', 3);
-      return midi <= b3Midi;
-    });
-  } else if (clef === 'treble') {
-    // Treble clef: lowest note should be C4  
-    handNotes = handNotes.filter(note => {
-      const midi = note.midi || scientificToMidi(note.letter, note.octave);
-      const c4Midi = scientificToMidi('C', 4);
-      return midi >= c4Midi;
-    });
+  // Apply strict Piano Mode note range limits only in hard mode
+  if (pianoModeSettings.hardMode) {
+    if (clef === 'bass') {
+      // Bass clef: highest note should be B3 (MIDI 59)
+      handNotes = handNotes.filter(note => {
+        const midi = note.midi || scientificToMidi(note.letter, note.octave);
+        const b3Midi = scientificToMidi('B', 3); // MIDI 59
+        return midi <= b3Midi;
+      });
+    } else if (clef === 'treble') {
+      // Treble clef: lowest note should be C4 (MIDI 60)
+      handNotes = handNotes.filter(note => {
+        const midi = note.midi || scientificToMidi(note.letter, note.octave);
+        const c4Midi = scientificToMidi('C', 4); // MIDI 60
+        return midi >= c4Midi;
+      });
+    }
   }
   
   return handNotes;
@@ -1744,16 +1801,11 @@ function pickRandomNote() {
   
   // Piano Mode enhancements
   if (pianoModeActive) {
-    // In Piano Mode, force Grand Staff if enabled
-    if (currentClef !== 'grand') {
-      currentClef = 'grand';
-      drawStaff(currentClef);
-      document.getElementById('clefDisplay').textContent = 'Clef selected: Grand Stave (Piano Mode)';
-      // Update available notes for grand staff
-      availableNotes = notePositions[currentClef];
+    // Ensure we have the right clef mode - this should be handled by onPianoModeChanged
+    // Don't force clef changes here, just use what's already set
+    if (!isDualClefMode()) {
+      console.warn('Piano Mode active but not in dual-clef mode. This should be handled by the mode switching logic.');
     }
-    
-    // Handle accidentals removed
   }
   
   // Filter notes based on ledger line settings using staffLocalIndex
@@ -1765,7 +1817,7 @@ function pickRandomNote() {
   } else {
     // Filter based on maximum ledger lines allowed
     availableNotes = availableNotes.filter(notePos => {
-      if (currentClef === 'grand') {
+      if (isDualClefMode()) {
         // For grand staff, both treble and bass use staff-local indexing
         // Allow ledger lines symmetrically around each staff
         return notePos.staffLocalIndex >= -maxLedgerLines && 
@@ -1793,35 +1845,78 @@ function pickRandomNote() {
     const rightHandActive = rightHandMode !== 'none';
     
     if (leftHandActive || rightHandActive) {
-      // Randomly choose which hand to generate for (weighted by which hands are active)
-      const activeHands = [];
-      if (leftHandActive) activeHands.push('left');
-      if (rightHandActive) activeHands.push('right');
-      
-      const chosenHand = activeHands[Math.floor(Math.random() * activeHands.length)];
-      
-      if (chosenHand === 'left' && leftHandActive) {
-        // Generate for left hand (bass clef)
-        const bassNotes = getNotesForPianoModeHand(leftHandMode, 'bass', availableNotes);
-        if (bassNotes.length > 0) {
-          if (leftHandMode === 'chords' && bassNotes.length >= 2) {
-            return generateChord(bassNotes);
-          } else {
-            // Melody mode or not enough notes for chord
-            const randomIndex = Math.floor(Math.random() * bassNotes.length);
-            return bassNotes[randomIndex];
+      // In hard mode with independent clefs, generate notes for individual clefs
+      if (pianoModeSettings.hardMode && leftHandActive && rightHandActive) {
+        // Check which clef needs a new note
+        const bassNotes = movingNotes.filter(note => note.clef === 'bass');
+        const trebleNotes = movingNotes.filter(note => note.clef === 'treble');
+        
+        // Prefer clef that has no active notes, or randomly choose if both are empty
+        let targetClef = null;
+        if (bassNotes.length === 0 && trebleNotes.length === 0) {
+          // Both clefs are empty, randomly choose
+          targetClef = Math.random() < 0.5 ? 'bass' : 'treble';
+        } else if (bassNotes.length === 0) {
+          targetClef = 'bass';
+        } else if (trebleNotes.length === 0) {
+          targetClef = 'treble';
+        } else {
+          // Both clefs have notes, don't spawn
+          return null;
+        }
+        
+        if (targetClef === 'bass') {
+          const bassNotesAvailable = getNotesForPianoModeHand(leftHandMode, 'bass', availableNotes);
+          if (bassNotesAvailable.length > 0) {
+            if (leftHandMode === 'chords' && bassNotesAvailable.length >= 2) {
+              return generateChord(bassNotesAvailable);
+            } else {
+              const randomBassIndex = Math.floor(Math.random() * bassNotesAvailable.length);
+              return bassNotesAvailable[randomBassIndex];
+            }
+          }
+        } else if (targetClef === 'treble') {
+          const trebleNotesAvailable = getNotesForPianoModeHand(rightHandMode, 'treble', availableNotes);
+          if (trebleNotesAvailable.length > 0) {
+            if (rightHandMode === 'chords' && trebleNotesAvailable.length >= 2) {
+              return generateChord(trebleNotesAvailable);
+            } else {
+              const randomTrebleIndex = Math.floor(Math.random() * trebleNotesAvailable.length);
+              return trebleNotesAvailable[randomTrebleIndex];
+            }
           }
         }
-      } else if (chosenHand === 'right' && rightHandActive) {
-        // Generate for right hand (treble clef)
-        const trebleNotes = getNotesForPianoModeHand(rightHandMode, 'treble', availableNotes);
-        if (trebleNotes.length > 0) {
-          if (rightHandMode === 'chords' && trebleNotes.length >= 2) {
-            return generateChord(trebleNotes);
-          } else {
-            // Melody mode or not enough notes for chord
-            const randomIndex = Math.floor(Math.random() * trebleNotes.length);
-            return trebleNotes[randomIndex];
+      } else {
+        // Normal Piano Mode behavior - randomly choose which hand to generate for
+        const activeHands = [];
+        if (leftHandActive) activeHands.push('left');
+        if (rightHandActive) activeHands.push('right');
+        
+        const chosenHand = activeHands[Math.floor(Math.random() * activeHands.length)];
+        
+        if (chosenHand === 'left' && leftHandActive) {
+          // Generate for left hand (bass clef)
+          const bassNotes = getNotesForPianoModeHand(leftHandMode, 'bass', availableNotes);
+          if (bassNotes.length > 0) {
+            if (leftHandMode === 'chords' && bassNotes.length >= 2) {
+              return generateChord(bassNotes);
+            } else {
+              // Melody mode or not enough notes for chord
+              const randomIndex = Math.floor(Math.random() * bassNotes.length);
+              return bassNotes[randomIndex];
+            }
+          }
+        } else if (chosenHand === 'right' && rightHandActive) {
+          // Generate for right hand (treble clef)
+          const trebleNotes = getNotesForPianoModeHand(rightHandMode, 'treble', availableNotes);
+          if (trebleNotes.length > 0) {
+            if (rightHandMode === 'chords' && trebleNotes.length >= 2) {
+              return generateChord(trebleNotes);
+            } else {
+              // Melody mode or not enough notes for chord
+              const randomIndex = Math.floor(Math.random() * trebleNotes.length);
+              return trebleNotes[randomIndex];
+            }
           }
         }
       }
@@ -1922,9 +2017,16 @@ function updateClefDisplay() {
     const clefNames = {
       'treble': 'Treble Clef',
       'bass': 'Bass Clef', 
-      'grand': 'Grand Stave'
+      'grand': 'Grand Stave',
+      'hardMode': 'Bass & Treble (Hard Mode)'
     };
     clefDisplay.textContent = `Clef selected: ${clefNames[currentClef]}`;
+    
+    // Show/hide hard mode help text based on current clef
+    const hardModeHelp = document.getElementById('hardModeHelp');
+    if (hardModeHelp) {
+      hardModeHelp.style.display = (currentClef === 'hardMode') ? 'block' : 'none';
+    }
   }
   
   // Update hand score visibility when clef changes
@@ -1953,12 +2055,6 @@ async function initializeGame() {
   if (gameSettings.music) {
     await startAllMusicTracks();
     updateMusicForLevel(level);
-  }
-  
-  // Hide Piano Mode controls during gameplay
-  const pianoModeControls = document.getElementById('pianoModeControls');
-  if (pianoModeControls) {
-    pianoModeControls.style.display = 'none';
   }
   
   // Initialize display values
@@ -1997,11 +2093,11 @@ async function handleNoteInput(userNote) {
   if (!userNote) return;
   
   // For Piano Mode, use more specific note matching
-  await handleNoteInputWithOctave(userNote, null); // No octave info from keyboard
+  await handleNoteInputWithOctave(userNote, null, null); // No octave info from keyboard, no target clef
 }
 
 // Enhanced note input handler with octave support for Piano Mode
-async function handleNoteInputWithOctave(userNote, userOctave) {
+async function handleNoteInputWithOctave(userNote, userOctave, targetClef) {
   if (!gameRunning) return;
   
   // FIXED: Clean up stale chord progress immediately on every input to prevent registration failures
@@ -2016,8 +2112,20 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
   // For piano mode with hand independence, only consider notes from active hands' clefs
   movingNotes.forEach((note, index) => {
     if (note.note.toUpperCase() === userNote) {
+      // In hard mode with target clef specified, only consider notes from that specific clef
+      if (pianoModeActive && pianoModeSettings.hardMode && targetClef) {
+        if (note.clef !== targetClef) {
+          return; // Skip notes from other clefs in hard mode
+        }
+      }
+      // In hard mode without target clef (keyboard input), disable non-targeted input
+      else if (pianoModeActive && pianoModeSettings.hardMode && !targetClef) {
+        // Skip non-targeted keyboard/button input in hard mode to prevent clef confusion
+        // User must use Shift+key for treble or Ctrl+key for bass clef targeting
+        return; // Skip all notes for non-targeted keyboard input in hard mode
+      }
       // In piano mode, check if this note belongs to an active hand
-      if (pianoModeActive && currentClef === 'grand') {
+      else if (pianoModeActive && isDualClefMode()) {
         const leftHandActive = pianoModeSettings.leftHand !== 'none';
         const rightHandActive = pianoModeSettings.rightHand !== 'none';
         
@@ -2145,7 +2253,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
         correctAnswers++;
         
         // Piano Mode: Track separate hand scores
-        if (pianoModeActive && currentClef === 'grand') {
+        if (pianoModeActive && isDualClefMode()) {
           if (matchedNote.clef === 'bass') {
             leftHandScore++;
           } else if (matchedNote.clef === 'treble') {
@@ -2159,7 +2267,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
         let staffInfo;
         let noteY;
         
-        if (currentClef === 'grand') {
+        if (isDualClefMode()) {
           if (firstChordNote.clef === 'treble' && currentTrebleStave) {
             staffInfo = currentTrebleStave;
             noteY = getNoteY(firstChordNote, staffInfo);
@@ -2244,7 +2352,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
       correctAnswers++;
       
       // Piano Mode: Track separate hand scores
-      if (pianoModeActive && currentClef === 'grand') {
+      if (pianoModeActive && isDualClefMode()) {
         if (matchedNote.clef === 'bass') {
           leftHandScore++;
         } else if (matchedNote.clef === 'treble') {
@@ -2257,7 +2365,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
       let staffInfo;
       let noteY;
       
-      if (currentClef === 'grand') {
+      if (isDualClefMode()) {
         if (matchedNote.clef === 'treble' && currentTrebleStave) {
           staffInfo = currentTrebleStave;
           noteY = getNoteY(matchedNote, staffInfo);
@@ -2315,7 +2423,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
     // Check for level progression
     let canAdvanceLevel = false;
     
-    if (pianoModeActive && currentClef === 'grand') {
+    if (pianoModeActive && isDualClefMode()) {
       // Piano Mode: level up when all active hands reach level 10
       const leftHandActive = pianoModeSettings.leftHand !== 'none';
       const rightHandActive = pianoModeSettings.rightHand !== 'none';
@@ -2447,14 +2555,20 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
       }
     }
     
-    // Find the leftmost note to destroy (regardless of whether it matches user input)
+    // Find the leftmost note to destroy (respecting clef boundaries in hard mode)
     let leftmostNoteToDestroy = null;
     let minNoteDistance = Infinity;
     
     // Find the leftmost note respecting hand boundaries in piano mode
     movingNotes.forEach((note, index) => {
+      // In hard mode with target clef specified, only consider notes from that specific clef
+      if (pianoModeActive && pianoModeSettings.hardMode && targetClef) {
+        if (note.clef !== targetClef) {
+          return; // Skip notes from other clefs in hard mode
+        }
+      }
       // In piano mode, check if this note belongs to an active hand
-      if (pianoModeActive && currentClef === 'grand') {
+      else if (pianoModeActive && isDualClefMode()) {
         const leftHandActive = pianoModeSettings.leftHand !== 'none';
         const rightHandActive = pianoModeSettings.rightHand !== 'none';
         
@@ -2533,7 +2647,7 @@ async function handleNoteInputWithOctave(userNote, userOctave) {
     let clefY = canvas.height * 0.2 + 60; // Default fallback
 
     // Get dynamic clef position based on the note's clef (for grand staff) or current staff
-    if (currentClef === 'grand' && leftmostNote) {
+    if (isDualClefMode() && leftmostNote) {
       // For grand staff, use the clef that corresponds to the wrong note
       if (leftmostNote.clef === 'treble' && currentTrebleStave) {
         clefX = currentTrebleStave.clefX;
@@ -2579,7 +2693,7 @@ function updateDisplays() {
   notesDestroyedDisplay.textContent = `Notes Destroyed: ${notesDestroyed}`;
   
   // Update hand scores if Piano Mode is active
-  if (pianoModeActive && currentClef === 'grand') {
+  if (pianoModeActive && isDualClefMode()) {
     leftHandDisplay.textContent = `Left Hand: ${leftHandScore}`;
     rightHandDisplay.textContent = `Right Hand: ${rightHandScore}`;
   }
@@ -2587,7 +2701,7 @@ function updateDisplays() {
 
 // Helper function to show/hide hand score displays based on Piano Mode state
 function updateHandScoreVisibility() {
-  const showHandScores = pianoModeActive && currentClef === 'grand';
+  const showHandScores = pianoModeActive && (isDualClefMode() || currentClef === 'hardMode');
   leftHandDisplay.style.display = showHandScores ? 'block' : 'none';
   rightHandDisplay.style.display = showHandScores ? 'block' : 'none';
   
@@ -2604,7 +2718,22 @@ document.addEventListener('keydown', function(e) {
   // Check if it's a letter A-G (case insensitive)
   const key = e.key.toUpperCase();
   if (key.match(/^[A-G]$/)) {
-    handleNoteInput(key);
+    // In hard mode, allow modifier keys to specify target clef
+    if (pianoModeActive && pianoModeSettings.hardMode) {
+      let targetClef = null;
+      if (e.shiftKey) {
+        targetClef = 'treble'; // Shift + letter for treble clef
+      } else if (e.ctrlKey || e.altKey) {
+        targetClef = 'bass';   // Ctrl/Alt + letter for bass clef  
+      }
+      // If no modifier keys, don't process input (user must be explicit)
+      if (targetClef) {
+        handleNoteInputWithOctave(key, null, targetClef);
+      }
+    } else {
+      // Normal mode - use regular input handling
+      handleNoteInput(key);
+    }
   }
 });
 
@@ -2650,12 +2779,6 @@ window.onload = function () {
   }
   
   initializeGame();
-  
-  // Hide Piano Mode controls immediately to prevent popup flash
-  const pianoModeControls = document.getElementById('pianoModeControls');
-  if (pianoModeControls) {
-    pianoModeControls.style.display = 'none';
-  }
   
   // Update clef display after DOM is ready
   updateClefDisplay();
@@ -2707,9 +2830,25 @@ window.onload = function () {
   
   // Add click event listeners for pitch buttons
   document.querySelectorAll('.pitch-btn').forEach(button => {
-    button.addEventListener('click', function() {
+    button.addEventListener('click', function(e) {
       const note = this.dataset.note;
-      handleNoteInput(note);
+      
+      // In hard mode, check for modifier keys to specify target clef
+      if (pianoModeActive && pianoModeSettings.hardMode) {
+        let targetClef = null;
+        if (e.shiftKey) {
+          targetClef = 'treble'; // Shift + click for treble clef
+        } else if (e.ctrlKey || e.altKey) {
+          targetClef = 'bass';   // Ctrl/Alt + click for bass clef
+        }
+        // If no modifier keys in hard mode, don't process input (user must be explicit)
+        if (targetClef) {
+          handleNoteInputWithOctave(note, null, targetClef);
+        }
+      } else {
+        // Normal mode - use regular input handling
+        handleNoteInput(note);
+      }
       
       // Visual feedback on button press - blue to white to blue
       this.style.background = '#fff';

@@ -11,6 +11,7 @@ declare global {
         isPianoModeActive: () => boolean;
         getPianoModeSettings: () => PianoModeSettings;
         reinitializeMidiAfterRestart: () => void;
+        updateMidiPianoModeSettings: (settings: Partial<PianoModeSettings>) => void;
     }
 }
 import { MidiDevice, MidiConnectionStatus, PianoModeSettings } from './midi-types.js';

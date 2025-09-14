@@ -680,3 +680,17 @@ h1 {
   color: #4CAF50;
   font-weight: bold;
 }
+
+.hard-mode-info {
+  margin-top: 5px;
+  padding: 5px 8px;
+  background: rgba(74, 144, 226, 0.2);
+  border: 1px solid rgba(74, 144, 226, 0.4);
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+}
+
+.hard-mode-info small {
+  color: #a0c4ff;
+  font-size: 11px;
+}

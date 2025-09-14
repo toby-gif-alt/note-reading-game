@@ -36,6 +36,9 @@
         <div id="leftHandScore" style="display: none;">Left Hand: 0</div>
         <div id="rightHandScore" style="display: none;">Right Hand: 0</div>
         <div id="clefDisplay">Clef selected: Treble Clef</div>
+        <div id="hardModeHelp" style="display: none; font-size: 11px; color: #ccc; margin-top: 5px;">
+          Hard Mode: Shift+Key=Treble | Ctrl+Key=Bass | MIDI: C4+=Treble, B3-=Bass
+        </div>
       </div>
       
       <div class="control-buttons">
@@ -83,36 +86,7 @@
     Level 2!
   </div>
 
-  <!-- Piano Mode Controls -->
-  <div id="pianoModeControls" class="piano-mode-controls" style="display: none !important; visibility: hidden;">
-    <div class="piano-mode-header">
-      <h3>🎹 Piano Mode</h3>
-    </div>
-    <div class="piano-mode-options">
-      <div class="piano-option">
-        <label>Left Hand (Bass):</label>
-        <select id="leftHandMode">
-          <option value="none">None</option>
-          <option value="melody">Melody</option>
-          <option value="chords">Chords</option>
-        </select>
-      </div>
-      <div class="piano-option">
-        <label>Right Hand (Treble):</label>
-        <select id="rightHandMode">
-          <option value="none">None</option>
-          <option value="melody">Melody</option>
-          <option value="chords">Chords</option>
-        </select>
-      </div>
-      <div class="piano-option">
-        <label>
-          <input type="checkbox" id="pianoGrandStaffForce" checked>
-          <span>Force Grand Staff</span>
-        </label>
-      </div>
-    </div>
-  </div>
+
   
 
   

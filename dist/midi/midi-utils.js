@@ -131,4 +131,23 @@ export function getNaturalNoteForGame(midiNote) {
     }
     return fullNoteName.charAt(0); // Return natural note letter
 }
+/**
+ * Determine which clef a MIDI note belongs to for hard mode split input
+ * @param midiNote MIDI note number
+ * @returns 'bass' for notes ≤B3 (59), 'treble' for notes ≥C4 (60)
+ */
+export function getClefForMidiNote(midiNote) {
+    // B3 = MIDI note 59, C4 = MIDI note 60
+    return midiNote <= 59 ? 'bass' : 'treble';
+}
+/**
+ * Check if a MIDI note is within the valid range for a specific clef in hard mode
+ * @param midiNote MIDI note number
+ * @param targetClef The clef to check against
+ * @returns True if the note belongs to the target clef in hard mode
+ */
+export function isNoteInClefRange(midiNote, targetClef) {
+    const noteClef = getClefForMidiNote(midiNote);
+    return noteClef === targetClef;
+}
 //# sourceMappingURL=midi-utils.js.map

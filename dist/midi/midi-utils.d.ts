@@ -59,3 +59,16 @@ export declare function formatNoteForDisplay(mapping: MidiNoteMapping): string;
  * @returns Natural note name for game input
  */
 export declare function getNaturalNoteForGame(midiNote: number): string;
+/**
+ * Determine which clef a MIDI note belongs to for hard mode split input
+ * @param midiNote MIDI note number
+ * @returns 'bass' for notes ≤B3 (59), 'treble' for notes ≥C4 (60)
+ */
+export declare function getClefForMidiNote(midiNote: number): 'bass' | 'treble';
+/**
+ * Check if a MIDI note is within the valid range for a specific clef in hard mode
+ * @param midiNote MIDI note number
+ * @param targetClef The clef to check against
+ * @returns True if the note belongs to the target clef in hard mode
+ */
+export declare function isNoteInClefRange(midiNote: number, targetClef: 'bass' | 'treble'): boolean;

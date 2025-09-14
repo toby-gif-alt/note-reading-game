@@ -31,6 +31,7 @@ export interface PianoModeSettings {
   forceGrandStaff: boolean;    // Always show grand staff when active
   leftHand?: 'none' | 'melody' | 'chords';   // Left hand mode (bass clef)
   rightHand?: 'none' | 'melody' | 'chords';  // Right hand mode (treble clef)
+  hardMode?: boolean;      // Enable MIDI input splitting (bass ≤B3, treble ≥C4)
 }
 
 export interface MidiConnectionStatus {

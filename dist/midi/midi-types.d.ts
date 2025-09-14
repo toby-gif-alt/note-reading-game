@@ -27,6 +27,7 @@ export interface PianoModeSettings {
     forceGrandStaff: boolean;
     leftHand?: 'none' | 'melody' | 'chords';
     rightHand?: 'none' | 'melody' | 'chords';
+    hardMode?: boolean;
 }
 export interface MidiConnectionStatus {
     isSupported: boolean;
