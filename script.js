@@ -1231,78 +1231,25 @@ function drawExplosions() {
 
 // Check if there's enough space to spawn a new note without overlap
 function canSpawnNote(minDistance = 100) {
-  // For normal mode (not piano mode), only allow one note at a time
-  if (!pianoModeActive && movingNotes.length > 0) {
+  // For both normal mode and piano mode, only allow one note/chord at a time
+  if (movingNotes.length > 0) {
     return false;
   }
   
-  if (movingNotes.length === 0) return true;
-  
-  // Piano mode logic (existing behavior)
-  // Find the rightmost note
-  const rightmostNote = movingNotes.reduce((rightmost, note) => {
-    return note.x > rightmost.x ? note : rightmost;
-  }, movingNotes[0]);
-  
-  // Calculate spawn position at right edge of stave (matches spawnNote function logic)
-  let spawnX = canvas.width + 20; // Default fallback
-  if (currentClef === 'grand') {
-    // For grand staff, use treble stave as reference
-    if (currentTrebleStave) {
-      spawnX = currentTrebleStave.x + currentTrebleStave.width; // Right edge of stave
-    }
-  } else if (currentClef === 'treble' && currentTrebleStave) {
-    spawnX = currentTrebleStave.x + currentTrebleStave.width; // Right edge of treble stave
-  } else if (currentClef === 'bass' && currentBassStave) {
-    spawnX = currentBassStave.x + currentBassStave.width; // Right edge of bass stave
-  }
-  
-  // Check if there's enough distance from the rightmost note to the spawn point
-  const distance = spawnX - rightmostNote.x;
-  
-  // Always allow spawning if there are fewer than 3 notes on screen to ensure gameplay continues
-  if (movingNotes.length < 3) {
-    return true;
-  }
-  
-  return distance >= minDistance;
+  return true;
 }
 
 // Spawn moving note only (no meteors) - continuous spawning
 function spawnNote() {
   const now = Date.now();
   
-  // Check what type of note will be spawned to adjust timing
-  const isChordSpawn = pianoModeActive && 
-    (pianoModeSettings.leftHand === 'chords' || pianoModeSettings.rightHand === 'chords');
-  
-  // Piano Mode speed adjustment with different rates for chords vs melody
+  // Piano Mode now uses the same spawn timing as normal mode
   let effectiveSpawnRate = noteSpawnRate;
-  if (pianoModeActive) {
-    // Check if both hands are in melody mode for special displacement handling
-    const bothHandsMelody = (pianoModeSettings.leftHand !== 'none' && pianoModeSettings.leftHand !== 'chords') &&
-                           (pianoModeSettings.rightHand !== 'none' && pianoModeSettings.rightHand !== 'chords');
-    
-    if (isChordSpawn) {
-      // Chords come at same speed as normal mode
-      effectiveSpawnRate = Math.floor(noteSpawnRate * 1.0); // Same speed as normal mode
-    } else if (bothHandsMelody) {
-      // Different speeds for each hand when both are melody, but closer spacing allowed
-      const leftHandSpawnRate = Math.floor(noteSpawnRate * 0.9); // Left hand 10% faster
-      const rightHandSpawnRate = Math.floor(noteSpawnRate * 1.0); // Right hand normal speed
-      // Use alternating spawn rates to create displacement
-      effectiveSpawnRate = (now % 2 === 0) ? leftHandSpawnRate : rightHandSpawnRate;
-    } else {
-      // Melody comes at normal speed
-      effectiveSpawnRate = Math.floor(noteSpawnRate * 1.0); // Same speed as normal mode
-    }
-  }
   
   if (now - lastNoteSpawn > effectiveSpawnRate) {
     // Check if there's enough space to spawn a new note without overlap
-    // Use consistent 120px spacing for non-piano mode, flexible spacing for piano mode
-    const minDistance = pianoModeActive ? 80 : 120; // Tighter spacing for piano mode
-    if (!canSpawnNote(minDistance)) {
+    // Use consistent 120px spacing for both modes since we're now spawning one at a time
+    if (!canSpawnNote(120)) {
       return; // Don't spawn if there would be overlap
     }
     
@@ -1323,29 +1270,8 @@ function spawnNote() {
       baseSpeed = 2.2 + (level - 4) * 0.4; // Each level adds 0.4 speed (increased from 0.3)
     }
     
-    // Piano Mode speed adjustment for note movement
-    if (pianoModeActive) {
-      // Check if both hands are in melody mode for different speed handling  
-      const bothHandsMelody = (pianoModeSettings.leftHand !== 'none' && pianoModeSettings.leftHand !== 'chords') &&
-                             (pianoModeSettings.rightHand !== 'none' && pianoModeSettings.rightHand !== 'chords');
-      
-      if (Array.isArray(noteData)) {
-        // Chords move slower
-        baseSpeed = baseSpeed * 0.7; // 30% slower movement for chords
-      } else if (bothHandsMelody) {
-        // Different speeds for each hand when both are melody
-        if (noteData.clef === 'bass') {
-          baseSpeed = baseSpeed * 0.95; // Left hand (bass) slightly faster
-        } else if (noteData.clef === 'treble') {
-          baseSpeed = baseSpeed * 0.85; // Right hand (treble) slower
-        } else {
-          baseSpeed = baseSpeed * 0.9; // Default melody speed
-        }
-      } else {
-        // Melody moves at normal Piano Mode speed
-        baseSpeed = baseSpeed * 0.9; // 10% slower movement for melody
-      }
-    }
+    // Piano Mode now uses same movement speed as normal mode
+    // No speed adjustments needed - baseSpeed remains unchanged
     
     // Handle chord mode (multiple notes)
     if (Array.isArray(noteData)) {
@@ -1460,9 +1386,8 @@ function forceSpawnNote() {
 // Spawn a replacement note when one is destroyed (wrong answer or collision)
 function respawnNote() {
   // Check if there's enough space to spawn a new note without overlap
-  // Use consistent 120px spacing for non-piano mode, flexible spacing for piano mode
-  const minDistance = pianoModeActive ? 80 : 120; // Tighter spacing for piano mode
-  if (!canSpawnNote(minDistance)) {
+  // Use consistent 120px spacing for both modes since we're now spawning one at a time
+  if (!canSpawnNote(120)) {
     // Try again shortly if there's not enough space
     setTimeout(respawnNote, 300); // Try again after 300ms
     return;
