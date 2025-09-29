@@ -4,6 +4,7 @@ let gameSettings = {
   soundEffects: true,
   clef: 'treble',
   ledgerLines: 0,  // Default to none (easy)
+  musicSelection: 'og',  // New property: 'og' for original, '8bit' for 8-bit
   pianoMode: {
     enabled: false,
     active: false,  // New property for user activation
@@ -77,6 +78,11 @@ function loadSettings() {
     const savedSettings = JSON.parse(saved);
     gameSettings = { ...gameSettings, ...savedSettings };
     
+    // Ensure musicSelection has a default value if missing
+    if (!gameSettings.musicSelection) {
+      gameSettings.musicSelection = 'og';
+    }
+    
     // Ensure pianoMode object has all required properties
     if (!gameSettings.pianoMode) {
       gameSettings.pianoMode = {
@@ -102,6 +108,7 @@ function loadSettings() {
   } else {
     // If no saved settings, use default (start with easy)
     gameSettings.ledgerLines = 0;
+    gameSettings.musicSelection = 'og';
   }
   updateSettingsDisplay();
 }
@@ -122,6 +129,9 @@ function updateSettingsDisplay() {
   // Update difficulty dropdown
   updateDifficultyDisplay();
   
+  // Update music selection dropdown
+  updateMusicSelectionDisplay();
+  
   // Update clef buttons
   updateClefButtons();
   
@@ -134,6 +144,14 @@ function updateDifficultyDisplay() {
   const ledgerLineSelect = document.getElementById('ledgerLineSelect');
   if (ledgerLineSelect) {
     ledgerLineSelect.value = gameSettings.ledgerLines.toString();
+  }
+}
+
+// Update music selection display for dropdown
+function updateMusicSelectionDisplay() {
+  const musicSelect = document.getElementById('musicSelect');
+  if (musicSelect) {
+    musicSelect.value = gameSettings.musicSelection;
   }
 }
 
@@ -554,6 +572,12 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('ledgerLineSelect').addEventListener('change', function() {
     gameSettings.ledgerLines = parseInt(this.value);
     saveSettings(); // Auto-save difficulty selection
+  });
+
+  // Music selection dropdown handler
+  document.getElementById('musicSelect').addEventListener('change', function() {
+    gameSettings.musicSelection = this.value;
+    saveSettings(); // Auto-save music selection
   });
   
   // Hard mode toggle - removed, so remove this event listener

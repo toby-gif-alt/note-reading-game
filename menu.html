@@ -44,16 +44,26 @@
     
     <!-- Main Game Controls Grid -->
     <div class="game-controls-grid">
-      <!-- Top Row: Ledger Line Dropdown -->
+      <!-- Top Row: Difficulty and Music Selection Dropdowns -->
       <div class="ledger-dropdown-section">
-        <label for="ledgerLineSelect">Difficulty:</label>
-        <select id="ledgerLineSelect" class="ledger-select">
-          <option value="0">Easy (No Ledger Lines)</option>
-          <option value="1">Medium (1 Line Each Side)</option>
-          <option value="2">Hard (2 Lines Each Side)</option>
-          <option value="3">Expert (3 Lines Each Side)</option>
-          <option value="4">Master (4 Lines Each Side)</option>
-        </select>
+        <div class="dropdown-group">
+          <label for="ledgerLineSelect">Difficulty:</label>
+          <select id="ledgerLineSelect" class="ledger-select">
+            <option value="0">Easy (No Ledger Lines)</option>
+            <option value="1">Medium (1 Line Each Side)</option>
+            <option value="2">Hard (2 Lines Each Side)</option>
+            <option value="3">Expert (3 Lines Each Side)</option>
+            <option value="4">Master (4 Lines Each Side)</option>
+          </select>
+        </div>
+        
+        <div class="dropdown-group">
+          <label for="musicSelect">Music:</label>
+          <select id="musicSelect" class="music-select">
+            <option value="og">OG - Mr C</option>
+            <option value="8bit">8-Bit - Ben Clark</option>
+          </select>
+        </div>
       </div>
       
       <!-- Middle Row: Tutorial, Start Game, Piano Mode -->

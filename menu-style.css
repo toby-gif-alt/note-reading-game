@@ -113,16 +113,25 @@
   margin: 0 auto;
 }
 
-/* Ledger Line Dropdown Section */
+/* Ledger Line Dropdown Section (now also includes music selection) */
 .ledger-dropdown-section {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  gap: 2rem;
   background: rgba(255, 255, 255, 0.9);
   padding: 1rem;
   border-radius: 10px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  flex-wrap: wrap;
+}
+
+.dropdown-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .ledger-dropdown-section label {
@@ -131,7 +140,7 @@
   color: #333;
 }
 
-.ledger-select {
+.ledger-select, .music-select {
   padding: 0.75rem 1rem;
   border: 2px solid #28a745;
   border-radius: 8px;
@@ -141,13 +150,32 @@
   color: #28a745;
   cursor: pointer;
   transition: all 0.3s ease;
-  min-width: 250px;
+  min-width: 200px;
   text-align: center;
 }
 
-.ledger-select:hover {
+.music-select {
+  border-color: #6c63ff;
+  color: #6c63ff;
+}
+
+.ledger-select:hover, .music-select:hover {
   background: #28a745;
   color: white;
+}
+
+.music-select:hover {
+  background: #6c63ff;
+}
+
+.ledger-select:focus, .music-select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.25);
+}
+
+.music-select:focus {
+  box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.25);
+}
   box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
 }
 
