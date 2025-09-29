@@ -272,6 +272,7 @@ let gameSettings = {
   music: true,
   soundEffects: true,
   clef: 'treble',
+  musicSelection: 'og',  // Default to original music
   pianoMode: {
     enabled: false,
     strictMode: false,
@@ -339,6 +340,11 @@ function loadGameSettings() {
   if (saved) {
     const settings = JSON.parse(saved);
     gameSettings = { ...gameSettings, ...settings };
+    
+    // Ensure musicSelection has a default value if missing
+    if (!gameSettings.musicSelection) {
+      gameSettings.musicSelection = 'og';
+    }
     
     // Ensure pianoMode object exists
     if (!gameSettings.pianoMode) {
@@ -441,31 +447,75 @@ window.onPianoModeChanged = onPianoModeChanged;
 window.updateGamePianoModeSettings = updateGamePianoModeSettings;
 
 // Audio system - Layered music system where all tracks play simultaneously
-const audioFiles = {
-  // Level music tracks - all play simultaneously and get unmuted as levels progress
-  // Using correct file names that match the actual files in audio directory
-  musicLevel2: new Audio('audio/level 2.wav'),
-  musicLevel3: new Audio('audio/level 3.wav'),
-  musicLevel4: new Audio('audio/level 4.wav'),
-  musicLevel5: new Audio('audio/level 5.wav'),
-  musicLevel6: new Audio('audio/level 6.wav'),
-  
-  // Sound effects
-  laser: new Audio('audio/laser.wav'),
-  meteorExplosion: new Audio('audio/meteor explosion.wav'),
-  explosionLoseLive: new Audio('audio/explosion lose live.wav'),
-  gameOver: new Audio('audio/game over.wav')
-};
+// Initialize with empty object - will be populated by initializeAudioFiles()
+const audioFiles = {};
 
-// Set all music tracks to loop and start them muted
-const musicTracks = ['musicLevel2', 'musicLevel3', 'musicLevel4', 'musicLevel5', 'musicLevel6'];
-musicTracks.forEach(trackName => {
-  if (audioFiles[trackName]) {
-    audioFiles[trackName].loop = true;
-    audioFiles[trackName].volume = 0; // Start muted
-    audioFiles[trackName].preload = 'auto'; // Ensure tracks are preloaded for synchronization
+// Initialize audio files based on music selection
+function initializeAudioFiles() {
+  // Clear existing audio files
+  Object.keys(audioFiles).forEach(key => {
+    if (audioFiles[key] && typeof audioFiles[key].pause === 'function') {
+      audioFiles[key].pause();
+      audioFiles[key].currentTime = 0;
+    }
+    delete audioFiles[key];
+  });
+
+  // Determine music path based on selection
+  const musicPath = gameSettings.musicSelection === '8bit' ? 'audio/8-bit/' : 'audio/';
+  
+  if (gameSettings.musicSelection === '8bit') {
+    // 8-bit music files (note the capital L in Level_)
+    audioFiles.musicLevel2 = new Audio(musicPath + 'Level_2.wav');
+    audioFiles.musicLevel3 = new Audio(musicPath + 'Level_3.wav');
+    audioFiles.musicLevel4 = new Audio(musicPath + 'Level_4.wav');
+    audioFiles.musicLevel5 = new Audio(musicPath + 'Level_5.wav');
+    audioFiles.musicLevel6 = new Audio(musicPath + 'Level_6.wav');
+    audioFiles.musicLevel7 = new Audio(musicPath + 'Level_7.wav');
+    audioFiles.musicLevel8 = new Audio(musicPath + 'Level_8.wav');
+  } else {
+    // Original music files
+    audioFiles.musicLevel2 = new Audio(musicPath + 'level 2.wav');
+    audioFiles.musicLevel3 = new Audio(musicPath + 'level 3.wav');
+    audioFiles.musicLevel4 = new Audio(musicPath + 'level 4.wav');
+    audioFiles.musicLevel5 = new Audio(musicPath + 'level 5.wav');
+    audioFiles.musicLevel6 = new Audio(musicPath + 'level 6.wav');
   }
-});
+  
+  // Sound effects (always from main audio folder)
+  audioFiles.laser = new Audio('audio/laser.wav');
+  audioFiles.meteorExplosion = new Audio('audio/meteor explosion.wav');
+  audioFiles.explosionLoseLive = new Audio('audio/explosion lose live.wav');
+  audioFiles.gameOver = new Audio('audio/game over.wav');
+  
+  // Update music tracks array based on available tracks
+  updateMusicTracksArray();
+  
+  // Set all music tracks to loop and start them muted
+  musicTracks.forEach(trackName => {
+    if (audioFiles[trackName]) {
+      audioFiles[trackName].loop = true;
+      audioFiles[trackName].volume = 0; // Start muted
+      audioFiles[trackName].preload = 'auto'; // Ensure tracks are preloaded for synchronization
+    }
+  });
+}
+
+// Update the musicTracks array based on available audio files
+function updateMusicTracksArray() {
+  if (gameSettings.musicSelection === '8bit') {
+    // 8-bit has additional level 7 and 8 tracks
+    musicTracks.splice(0, musicTracks.length, 
+      'musicLevel2', 'musicLevel3', 'musicLevel4', 'musicLevel5', 'musicLevel6', 'musicLevel7', 'musicLevel8');
+  } else {
+    // Original has levels 2-6
+    musicTracks.splice(0, musicTracks.length, 
+      'musicLevel2', 'musicLevel3', 'musicLevel4', 'musicLevel5', 'musicLevel6');
+  }
+}
+
+// Music tracks array - will be updated by updateMusicTracksArray()
+let musicTracks = [];
 
 // Track which music tracks are currently active
 let activeMusicTracks = [];
@@ -511,18 +561,26 @@ function updateMusicForLevel(currentLevel) {
     return;
   }
   
-  // For levels 2-6: Unmute tracks progressively (only using available tracks)
+  // For levels 2+: Unmute tracks progressively (only using available tracks)
   // Level 2: only level 2 music
   // Level 3: level 2 + level 3 music  
   // Level 4: level 2 + level 3 + level 4 music
   // Level 5: level 2 + level 3 + level 4 + level 5 music
-  // Level 6+: level 2 + level 3 + level 4 + level 5 + level 6 music (keeps looping)
+  // Level 6: level 2 + level 3 + level 4 + level 5 + level 6 music
+  // Level 7: level 2 + level 3 + level 4 + level 5 + level 6 + level 7 music (8-bit only)
+  // Level 8+: all available tracks (8-bit: 2-8, OG: 2-6)
   const tracksToUnmute = [];
   if (currentLevel >= 2) tracksToUnmute.push('musicLevel2');
   if (currentLevel >= 3) tracksToUnmute.push('musicLevel3');
   if (currentLevel >= 4) tracksToUnmute.push('musicLevel4');
   if (currentLevel >= 5) tracksToUnmute.push('musicLevel5');
   if (currentLevel >= 6) tracksToUnmute.push('musicLevel6');
+  
+  // Additional tracks for 8-bit music
+  if (gameSettings.musicSelection === '8bit') {
+    if (currentLevel >= 7) tracksToUnmute.push('musicLevel7');
+    if (currentLevel >= 8) tracksToUnmute.push('musicLevel8');
+  }
   
   // Update volume for all tracks
   musicTracks.forEach(trackName => {
@@ -2036,6 +2094,9 @@ function updateClefDisplay() {
 // Initialize game
 async function initializeGame() {
   // Settings are already loaded by loadGameSettings() before this function is called
+  
+  // Initialize audio files based on music selection
+  initializeAudioFiles();
   
   // Update clef selector if it exists
   if (clefSelect) {
