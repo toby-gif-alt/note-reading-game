@@ -446,12 +446,229 @@ function updateGamePianoModeSettings(settings) {
 window.onPianoModeChanged = onPianoModeChanged;
 window.updateGamePianoModeSettings = updateGamePianoModeSettings;
 
-// Audio system - Layered music system where all tracks play simultaneously
+// Audio system - Web Audio API-based music system for perfect synchronization
 // Initialize with empty object - will be populated by initializeAudioFiles()
 const audioFiles = {};
 
+// Web Audio API Music System
+class WebAudioMusicSystem {
+  constructor() {
+    this.audioContext = null;
+    this.masterGainNode = null;
+    this.tracks = new Map(); // Map of level index to track data
+    this.isInitialized = false;
+    this.isPlaying = false;
+    this.startTime = null;
+  }
+
+  async init() {
+    try {
+      // Create AudioContext
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      
+      // Create master gain node
+      this.masterGainNode = this.audioContext.createGain();
+      this.masterGainNode.connect(this.audioContext.destination);
+      
+      // Load all audio files based on current music selection
+      await this.loadAudioFiles();
+      
+      this.isInitialized = true;
+      console.log('Web Audio music system initialized');
+    } catch (error) {
+      console.error('Failed to initialize Web Audio music system:', error);
+      this.isInitialized = false;
+    }
+  }
+
+  async loadAudioFiles() {
+    // Determine music path and file list based on selection
+    const musicPath = gameSettings.musicSelection === '8bit' ? 'audio/8-bit/' : 'audio/';
+    const fileList = gameSettings.musicSelection === '8bit' 
+      ? [
+          { level: 2, file: 'Level_2.wav' },
+          { level: 3, file: 'Level_3.wav' },
+          { level: 4, file: 'Level_4.wav' },
+          { level: 5, file: 'Level_5.wav' },
+          { level: 6, file: 'Level_6.wav' },
+          { level: 7, file: 'Level_7.wav' },
+          { level: 8, file: 'Level_8.wav' }
+        ]
+      : [
+          { level: 2, file: 'level 2.wav' },
+          { level: 3, file: 'level 3.wav' },
+          { level: 4, file: 'level 4.wav' },
+          { level: 5, file: 'level 5.wav' },
+          { level: 6, file: 'level 6.wav' }
+        ];
+
+    // Load all audio files into AudioBuffers
+    const loadPromises = fileList.map(async ({ level, file }) => {
+      try {
+        const response = await fetch(musicPath + file);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+        
+        // Create gain node for this track
+        const gainNode = this.audioContext.createGain();
+        gainNode.gain.value = 0; // Start muted
+        gainNode.connect(this.masterGainNode);
+        
+        this.tracks.set(level, {
+          buffer: audioBuffer,
+          gainNode: gainNode,
+          sourceNode: null,
+          isMuted: true
+        });
+        
+        console.log(`Loaded track for level ${level}`);
+      } catch (error) {
+        console.error(`Failed to load track for level ${level}:`, error);
+      }
+    });
+
+    await Promise.all(loadPromises);
+  }
+
+  async startMusic() {
+    if (!this.isInitialized || this.isPlaying) return;
+
+    // Resume AudioContext if it's suspended (required by browser autoplay policies)
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
+
+    // Create source nodes for all tracks and start them at exactly the same time
+    const now = this.audioContext.currentTime;
+    this.startTime = now;
+
+    this.tracks.forEach((track, level) => {
+      // Create new source node
+      const sourceNode = this.audioContext.createBufferSource();
+      sourceNode.buffer = track.buffer;
+      sourceNode.loop = true;
+      sourceNode.connect(track.gainNode);
+      
+      // Start at the exact same time
+      sourceNode.start(now);
+      
+      // Store reference to source node
+      track.sourceNode = sourceNode;
+    });
+
+    this.isPlaying = true;
+    console.log('All music tracks started synchronously at time:', now);
+  }
+
+  stopMusic() {
+    if (!this.isPlaying) return;
+
+    this.tracks.forEach((track) => {
+      if (track.sourceNode) {
+        track.sourceNode.stop();
+        track.sourceNode = null;
+      }
+    });
+
+    this.isPlaying = false;
+    this.startTime = null;
+    console.log('All music tracks stopped');
+  }
+
+  unmuteLevel(levelIndex, smooth = true) {
+    const track = this.tracks.get(levelIndex);
+    if (!track || !track.isMuted) return;
+
+    track.isMuted = false;
+    
+    if (smooth) {
+      // Smooth ramp to avoid clicks
+      const now = this.audioContext.currentTime;
+      const rampTime = 0.1; // 100ms ramp
+      
+      track.gainNode.gain.cancelScheduledValues(now);
+      track.gainNode.gain.setValueAtTime(0, now);
+      track.gainNode.gain.linearRampToValueAtTime(1.0, now + rampTime);
+    } else {
+      track.gainNode.gain.value = 1.0;
+    }
+    
+    console.log(`Unmuted level ${levelIndex} track`);
+  }
+
+  muteLevel(levelIndex, smooth = true) {
+    const track = this.tracks.get(levelIndex);
+    if (!track || track.isMuted) return;
+
+    track.isMuted = true;
+    
+    if (smooth) {
+      // Smooth ramp to avoid clicks
+      const now = this.audioContext.currentTime;
+      const rampTime = 0.1; // 100ms ramp
+      
+      track.gainNode.gain.cancelScheduledValues(now);
+      track.gainNode.gain.setValueAtTime(track.gainNode.gain.value, now);
+      track.gainNode.gain.linearRampToValueAtTime(0, now + rampTime);
+    } else {
+      track.gainNode.gain.value = 0;
+    }
+    
+    console.log(`Muted level ${levelIndex} track`);
+  }
+
+  muteAllLevels() {
+    this.tracks.forEach((track, level) => {
+      this.muteLevel(level, false); // No smooth ramp for bulk muting
+    });
+  }
+
+  setMasterVolume(volume) {
+    if (this.masterGainNode) {
+      this.masterGainNode.gain.value = Math.max(0, Math.min(1, volume));
+    }
+  }
+
+  destroy() {
+    this.stopMusic();
+    if (this.audioContext) {
+      this.audioContext.close();
+    }
+    this.tracks.clear();
+    this.isInitialized = false;
+  }
+}
+
+// Global music system instance
+let musicSystem = new WebAudioMusicSystem();
+
+// Helper functions as requested
+async function initMusic() {
+  if (!musicSystem.isInitialized) {
+    await musicSystem.init();
+  }
+}
+
+function unmuteLevel(levelIndex) {
+  musicSystem.unmuteLevel(levelIndex);
+}
+
+function muteLevel(levelIndex) {
+  musicSystem.muteLevel(levelIndex);
+}
+
+// Reinitialize music system when settings change
+async function reinitializeMusicSystem() {
+  if (musicSystem) {
+    musicSystem.destroy();
+  }
+  musicSystem = new WebAudioMusicSystem();
+  musicStarted = false;
+  await initMusic();
+}
+
 // Initialize audio files based on music selection
-function initializeAudioFiles() {
+async function initializeAudioFiles() {
   // Clear existing audio files
   Object.keys(audioFiles).forEach(key => {
     if (audioFiles[key] && typeof audioFiles[key].pause === 'function') {
@@ -461,28 +678,7 @@ function initializeAudioFiles() {
     delete audioFiles[key];
   });
 
-  // Determine music path based on selection
-  const musicPath = gameSettings.musicSelection === '8bit' ? 'audio/8-bit/' : 'audio/';
-  
-  if (gameSettings.musicSelection === '8bit') {
-    // 8-bit music files (note the capital L in Level_)
-    audioFiles.musicLevel2 = new Audio(musicPath + 'Level_2.wav');
-    audioFiles.musicLevel3 = new Audio(musicPath + 'Level_3.wav');
-    audioFiles.musicLevel4 = new Audio(musicPath + 'Level_4.wav');
-    audioFiles.musicLevel5 = new Audio(musicPath + 'Level_5.wav');
-    audioFiles.musicLevel6 = new Audio(musicPath + 'Level_6.wav');
-    audioFiles.musicLevel7 = new Audio(musicPath + 'Level_7.wav');
-    audioFiles.musicLevel8 = new Audio(musicPath + 'Level_8.wav');
-  } else {
-    // Original music files
-    audioFiles.musicLevel2 = new Audio(musicPath + 'level 2.wav');
-    audioFiles.musicLevel3 = new Audio(musicPath + 'level 3.wav');
-    audioFiles.musicLevel4 = new Audio(musicPath + 'level 4.wav');
-    audioFiles.musicLevel5 = new Audio(musicPath + 'level 5.wav');
-    audioFiles.musicLevel6 = new Audio(musicPath + 'level 6.wav');
-  }
-  
-  // Sound effects (always from main audio folder)
+  // Sound effects (still use HTML5 Audio for simplicity)
   audioFiles.laser = new Audio('audio/laser.wav');
   audioFiles.meteorExplosion = new Audio('audio/meteor explosion.wav');
   audioFiles.explosionLoseLive = new Audio('audio/explosion lose live.wav');
@@ -491,14 +687,12 @@ function initializeAudioFiles() {
   // Update music tracks array based on available tracks
   updateMusicTracksArray();
   
-  // Set all music tracks to loop and start them muted
-  musicTracks.forEach(trackName => {
-    if (audioFiles[trackName]) {
-      audioFiles[trackName].loop = true;
-      audioFiles[trackName].volume = 0; // Start muted
-      audioFiles[trackName].preload = 'auto'; // Ensure tracks are preloaded for synchronization
-    }
-  });
+  // Reinitialize the Web Audio music system with new settings
+  try {
+    await reinitializeMusicSystem();
+  } catch (error) {
+    console.error('Failed to initialize music system:', error);
+  }
 }
 
 // Update the musicTracks array based on available audio files
@@ -536,13 +730,10 @@ function showLevelPopup(levelNumber) {
 
 // Layered music system - all tracks play simultaneously, unmuted based on level
 function updateMusicForLevel(currentLevel) {
-  if (!gameSettings.music) {
+  if (!gameSettings.music || !musicSystem.isInitialized) {
     // If music is disabled, mute all tracks
-    musicTracks.forEach(trackName => {
-      if (audioFiles[trackName]) {
-        audioFiles[trackName].volume = 0;
-      }
-    });
+    musicSystem.muteAllLevels();
+    activeMusicTracks = [];
     return;
   }
   
@@ -550,18 +741,17 @@ function updateMusicForLevel(currentLevel) {
   const musicVolumeSlider = document.getElementById('musicVolume');
   const baseVolume = musicVolumeSlider ? parseFloat(musicVolumeSlider.value) : 0.7;
   
+  // Set master volume
+  musicSystem.setMasterVolume(baseVolume);
+  
   // Level 1: No music (all tracks muted)
   if (currentLevel === 1) {
-    musicTracks.forEach(trackName => {
-      if (audioFiles[trackName]) {
-        audioFiles[trackName].volume = 0;
-      }
-    });
+    musicSystem.muteAllLevels();
     activeMusicTracks = [];
     return;
   }
   
-  // For levels 2+: Unmute tracks progressively (only using available tracks)
+  // For levels 2+: Unmute tracks progressively
   // Level 2: only level 2 music
   // Level 3: level 2 + level 3 music  
   // Level 4: level 2 + level 3 + level 4 music
@@ -569,88 +759,53 @@ function updateMusicForLevel(currentLevel) {
   // Level 6: level 2 + level 3 + level 4 + level 5 + level 6 music
   // Level 7: level 2 + level 3 + level 4 + level 5 + level 6 + level 7 music (8-bit only)
   // Level 8+: all available tracks (8-bit: 2-8, OG: 2-6)
-  const tracksToUnmute = [];
-  if (currentLevel >= 2) tracksToUnmute.push('musicLevel2');
-  if (currentLevel >= 3) tracksToUnmute.push('musicLevel3');
-  if (currentLevel >= 4) tracksToUnmute.push('musicLevel4');
-  if (currentLevel >= 5) tracksToUnmute.push('musicLevel5');
-  if (currentLevel >= 6) tracksToUnmute.push('musicLevel6');
+  
+  // First mute all tracks
+  musicSystem.muteAllLevels();
+  
+  // Then unmute the appropriate tracks for this level
+  const levelsToUnmute = [];
+  if (currentLevel >= 2) levelsToUnmute.push(2);
+  if (currentLevel >= 3) levelsToUnmute.push(3);
+  if (currentLevel >= 4) levelsToUnmute.push(4);
+  if (currentLevel >= 5) levelsToUnmute.push(5);
+  if (currentLevel >= 6) levelsToUnmute.push(6);
   
   // Additional tracks for 8-bit music
   if (gameSettings.musicSelection === '8bit') {
-    if (currentLevel >= 7) tracksToUnmute.push('musicLevel7');
-    if (currentLevel >= 8) tracksToUnmute.push('musicLevel8');
+    if (currentLevel >= 7) levelsToUnmute.push(7);
+    if (currentLevel >= 8) levelsToUnmute.push(8);
   }
   
-  // Update volume for all tracks
-  musicTracks.forEach(trackName => {
-    if (audioFiles[trackName]) {
-      if (tracksToUnmute.includes(trackName)) {
-        audioFiles[trackName].volume = baseVolume;
-      } else {
-        audioFiles[trackName].volume = 0;
-      }
-    }
+  // Unmute the appropriate tracks
+  levelsToUnmute.forEach(level => {
+    musicSystem.unmuteLevel(level);
   });
   
-  activeMusicTracks = tracksToUnmute;
+  // Update active tracks list for compatibility
+  activeMusicTracks = levelsToUnmute.map(level => `musicLevel${level}`);
 }
 
 async function startAllMusicTracks() {
   if (!gameSettings.music) return;
   
-  // Ensure all tracks are loaded and ready before starting
-  const trackPromises = musicTracks.map(trackName => {
-    const track = audioFiles[trackName];
-    if (track) {
-      return new Promise((resolve) => {
-        const checkReady = () => {
-          if (track.readyState >= 3) { // HAVE_FUTURE_DATA or better
-            track.currentTime = 0;
-            resolve(track);
-          } else {
-            track.addEventListener('canplay', () => {
-              track.currentTime = 0;
-              resolve(track);
-            }, { once: true });
-          }
-        };
-        checkReady();
-      });
-    }
-    return Promise.resolve(null);
-  });
-  
   try {
-    // Wait for all tracks to be ready
-    const readyTracks = await Promise.all(trackPromises);
+    // Initialize music system if not already done
+    await initMusic();
     
-    // Start all tracks at exactly the same moment
-    const playPromises = readyTracks.map(track => {
-      if (track && track.paused) {
-        return track.play().catch(e => console.log(`Failed to start track:`, e));
-      }
-      return Promise.resolve();
-    });
+    // Start the Web Audio music system
+    await musicSystem.startMusic();
     
-    // Wait for all play() calls to complete
-    await Promise.all(playPromises);
-    
-    console.log('All music tracks started synchronously');
+    console.log('Web Audio music system started');
   } catch (error) {
-    console.log('Error starting music tracks:', error);
+    console.log('Error starting music system:', error);
   }
 }
 
 function stopAllMusic() {
-  musicTracks.forEach(trackName => {
-    const track = audioFiles[trackName];
-    if (track) {
-      track.pause();
-      track.currentTime = 0;
-      track.volume = 0;
-    }
-  });
+  if (musicSystem) {
+    musicSystem.stopMusic();
+  }
   activeMusicTracks = [];
 }
 
@@ -2096,7 +2251,7 @@ async function initializeGame() {
   // Settings are already loaded by loadGameSettings() before this function is called
   
   // Initialize audio files based on music selection
-  initializeAudioFiles();
+  await initializeAudioFiles();
   
   // Update clef selector if it exists
   if (clefSelect) {
