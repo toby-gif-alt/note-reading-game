@@ -62,39 +62,14 @@ export function isNaturalNote(midiNote) {
     return [0, 2, 4, 5, 7, 9, 11].includes(noteInOctave);
 }
 /**
- * Get the closest natural note for a given MIDI note
- * Useful for mapping sharp/flat notes to natural notes for the game
+ * Preserve the exact MIDI pitch so accidentals can be validated correctly.
+ * The game currently displays natural notes only, so black keys must not be
+ * silently converted into neighbouring white-key answers.
  * @param midiNote MIDI note number
- * @returns MIDI note number of closest natural note
+ * @returns The unchanged MIDI note number
  */
 export function getClosestNaturalNote(midiNote) {
-    if (isNaturalNote(midiNote)) {
-        return midiNote;
-    }
-    const noteInOctave = midiNote % 12;
-    const octave = Math.floor(midiNote / 12);
-    // Map sharp/flat notes to their natural equivalents
-    let naturalNoteInOctave;
-    switch (noteInOctave) {
-        case 1: // C#/Db -> C
-            naturalNoteInOctave = 0;
-            break;
-        case 3: // D#/Eb -> D
-            naturalNoteInOctave = 2;
-            break;
-        case 6: // F#/Gb -> F
-            naturalNoteInOctave = 5;
-            break;
-        case 8: // G#/Ab -> G
-            naturalNoteInOctave = 7;
-            break;
-        case 10: // A#/Bb -> A
-            naturalNoteInOctave = 9;
-            break;
-        default:
-            naturalNoteInOctave = noteInOctave;
-    }
-    return octave * 12 + naturalNoteInOctave;
+    return midiNote;
 }
 /**
  * Check if a MIDI note is in the playable range for the game
@@ -115,21 +90,16 @@ export function formatNoteForDisplay(mapping) {
     return `${mapping.noteName}${mapping.octave} (MIDI ${mapping.midiNote})`;
 }
 /**
- * Get the natural note name from a MIDI note for game input
- * Maps sharps/flats to closest natural
+ * Get the note name from MIDI input for game validation.
+ * Accidentals are deliberately preserved (for example C# stays C#), so the
+ * natural-note game rejects them instead of treating them as C, D, F, G, or A.
  * @param midiNote MIDI note number
- * @returns Natural note name for game input
+ * @returns Note name for game input
  */
 export function getNaturalNoteForGame(midiNote) {
     const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     const noteIndex = midiNote % 12;
-    const fullNoteName = noteNames[noteIndex];
-    if (fullNoteName.includes('#')) {
-        // Map sharp notes to the closest natural note
-        const closestNatural = getClosestNaturalNote(midiNote);
-        return noteNames[closestNatural % 12].charAt(0);
-    }
-    return fullNoteName.charAt(0); // Return natural note letter
+    return noteNames[noteIndex];
 }
 /**
  * Determine which clef a MIDI note belongs to for hard mode split input
